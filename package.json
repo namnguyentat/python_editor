@@ -71,7 +71,8 @@
     "@jupyterlab/outputarea": "^1.0.1",
     "@jupyterlab/services": "^4.0.1",
     "@jupyterlab/theme-light-extension": "^1.0.1",
-    "jquery": "^3.4.1"
+    "jquery": "^3.4.1",
+    "monaco-editor-webpack-plugin": "1.7.0"
   },
   "scripts": {
     "start": "node scripts/start.js",

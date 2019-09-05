@@ -6,7 +6,7 @@ class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      code: '// type your code...'
+      code: `# Type your code here`
     };
   }
   editorDidMount(editor, monaco) {
@@ -27,7 +27,7 @@ class App extends React.Component {
         width="800"
         height="600"
         language="python"
-        theme="vs-dark"
+        theme="vs"
         value={code}
         options={options}
         onChange={this.onChange}
