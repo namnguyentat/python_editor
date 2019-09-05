@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "name": "@monaco-languageclient/example",
+  "version": "0.0.1",
+  "dependencies": {
+    "express": "^4.15.2",
+    "vscode-languageserver": "^4.0.0",
+    "vscode-ws-jsonrpc": "^0.0.2-1",
+    "ws": "^5.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node server.js"
+  }
+}

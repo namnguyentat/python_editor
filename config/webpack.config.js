@@ -290,7 +290,10 @@ module.exports = function(webpackEnv) {
       alias: {
         // Support React Native Web
         // https://www.smashingmagazine.com/2016/08/a-glimpse-into-the-future-with-react-native-for-web/
-        'react-native': 'react-native-web'
+        'react-native': 'react-native-web',
+        vscode: require.resolve(
+          'monaco-languageclient/lib/vscode-compatibility'
+        )
       },
       plugins: [
         // Adds support for installing with Plug'n'Play, leading to faster installs and adding
@@ -642,7 +645,8 @@ module.exports = function(webpackEnv) {
       http2: 'empty',
       net: 'empty',
       tls: 'empty',
-      child_process: 'empty'
+      child_process: 'empty',
+      crypto: 'empty'
     },
     // Turn off performance processing because we utilize
     // our own hints via the FileSizeReporter
