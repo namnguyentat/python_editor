@@ -1,5 +1,15 @@
 # How to start
 
+## Feaures
+
+- Monaco editor for UI
+- python-language-server for auto suggestion
+- Jupyter protocol to execute code
+
+## Todo
+- Tow layer structure
+- Execute code line by line
+
 ## Start pyls and jupyter server
 
 - Go to `pyls` server and follow README to start python language server
