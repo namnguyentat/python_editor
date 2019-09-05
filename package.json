@@ -3,9 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "monaco-editor": "^0.15.1",
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
+    "react-monaco-editor": "^0.31.0",
     "react-scripts": "3.1.1"
+  },
+  "devDependencies": {
+    "@jupyter-widgets/base": "^2.0.1",
+    "@jupyter-widgets/controls": "^1.5.1",
+    "@jupyter-widgets/html-manager": "^0.18.2",
+    "@jupyter-widgets/output": "^2.0.0",
+    "@jupyterlab/codemirror": "^1.0.1",
+    "@jupyterlab/mathjax2": "^1.0.0",
+    "@jupyterlab/outputarea": "^1.0.1",
+    "@jupyterlab/services": "^4.0.1",
+    "@jupyterlab/theme-light-extension": "^1.0.1",
+    "jquery": "^3.4.1"
   },
   "scripts": {
     "start": "react-scripts start",
