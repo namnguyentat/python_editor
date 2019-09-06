@@ -16,7 +16,17 @@ class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      code: `# Type your code here`
+      code: `# Type your code here
+import random
+
+
+def print_random():
+    print(print(random.randint(1, 10)))
+
+
+print('hello world')
+print('aaaa')
+print_random()`
     };
   }
 
@@ -33,6 +43,7 @@ class App extends React.Component {
   }
 
   componentDidMount() {
+    window.python_code = this.state.code;
     const url = createUrl('/pyls');
     const webSocket = createWebSocket(url);
     // listen when the web socket is opened

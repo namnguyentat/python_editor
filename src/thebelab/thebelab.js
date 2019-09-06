@@ -29,6 +29,7 @@ import './index.css';
 
 import * as base from '@jupyter-widgets/base';
 import * as controls from '@jupyter-widgets/controls';
+import delay from 'lodash/delay';
 
 if (typeof window !== 'undefined' && typeof window.define !== 'undefined') {
   window.define('@jupyter-widgets/base', base);
@@ -187,6 +188,12 @@ function renderCell(element, options) {
       .click(execute)
   );
   $cell.append(
+    $("<button class='thebelab-button thebelab-run-line-button'>")
+      .text('run line')
+      .attr('title', 'run this cell line by line')
+      .click(execute_line)
+  );
+  $cell.append(
     $("<button class='thebelab-button thebelab-restart-button'>")
       .text('restart')
       .attr('title', 'restart the kernel')
@@ -231,6 +238,70 @@ function renderCell(element, options) {
     }
     kernelPromise.then(kernel => {
       outputArea.future = kernel.requestExecute({ code: code });
+    });
+    return false;
+  }
+
+  function execute_line() {
+    let kernel = $cell.data('kernel');
+    // let code = cm.getValue();
+    let code = window.python_code;
+    if (!kernel) {
+      console.debug('No kernel connected');
+      outputArea.model.clear();
+      outputArea.model.add({
+        output_type: 'stream',
+        name: 'stdout',
+        text: 'Waiting for kernel...'
+      });
+      events.trigger('request-kernel');
+    }
+    const lines = code
+      .split('\n')
+      .filter(line => line.trim().length > 0 && !line.startsWith('#'));
+    let buffer = [];
+    const execute_code = [];
+    lines.forEach((line, index) => {
+      if (buffer.length === 0) {
+        if (index === lines.length - 1) {
+          execute_code.push(line);
+        } else if (line.endsWith(':')) {
+          buffer.push(line);
+        } else {
+          execute_code.push(line);
+        }
+        return;
+      } else {
+        if (line.startsWith(' ')) {
+          buffer.push(line);
+        } else {
+          execute_code.push(buffer.join('\n'));
+          buffer = [];
+          execute_code.push(line);
+        }
+      }
+    });
+    console.log(execute_code);
+    let modelOutput = [];
+    execute_code.forEach((line, index) => {
+      const delayFunc = function(number) {
+        kernelPromise.then(kernel => {
+          if (number === 0) {
+            outputArea.model.clear();
+            modelOutput = [];
+          } else {
+            modelOutput = [...modelOutput, ...outputArea.model.toJSON()];
+          }
+          outputArea.future = kernel.requestExecute({ code: line });
+          if (number === execute_code.length - 1) {
+            delay(() => {
+              modelOutput = [...modelOutput, ...outputArea.model.toJSON()];
+              outputArea.model.fromJSON(modelOutput);
+            }, 1000);
+          }
+        });
+      };
+      delay(delayFunc.bind(this, index), index * 500);
     });
     return false;
   }
