@@ -18,8 +18,6 @@ import {
 import { ThebeManager } from './manager';
 import { requireLoader } from '@jupyter-widgets/html-manager';
 
-import { Mode } from '@jupyterlab/codemirror';
-
 import '@jupyterlab/theme-light-extension/style/index.css';
 import '@jupyter-widgets/controls/css/widgets-base.css';
 import './index.css';
@@ -39,29 +37,20 @@ if (typeof window !== 'undefined' && typeof window.define !== 'undefined') {
 // make CodeMirror public for loading additional themes
 if (typeof window !== 'undefined') {
   window.CodeMirror = CodeMirror;
+  window.jQuery = $;
+  window.$ = $;
 }
 
 // events
-
-export const events = $({});
-export const on = function() {
-  events.on.apply(events, arguments);
-};
-export const one = function() {
-  events.one.apply(events, arguments);
-};
-export const off = function() {
-  events.off.apply(events, arguments);
-};
+const events = $({});
 
 // options
-
 const _defaultOptions = {
-  bootstrap: false,
+  bootstrap: true,
   preRenderHook: false,
   stripPrompts: false,
-  requestKernel: false,
-  predefinedOutput: true,
+  requestKernel: true,
+  predefinedOutput: false,
   mathjaxUrl: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js',
   mathjaxConfig: 'TeX-AMS_CHTML-full,Safe',
   selector: '[data-executable]',
@@ -71,52 +60,23 @@ const _defaultOptions = {
     binderUrl: 'https://mybinder.org'
   },
   kernelOptions: {
-    path: '/'
+    name: 'python3',
+    path: '/',
+    serverSettings: {
+      baseUrl: 'http://127.0.0.1:8888',
+      wsUrl: 'ws://127.0.0.1:8888',
+      token: 'test-secret'
+    }
   }
 };
 
-let _pageConfigData = undefined;
-function getPageConfig(key) {
-  if (typeof window === 'undefined') return;
-  if (!_pageConfigData) {
-    _pageConfigData = {};
-    $("script[type='text/x-thebe-config']").map((i, el) => {
-      if (el.getAttribute('data-thebe-loaded')) {
-        // already loaded
-        return true;
-      }
-      el.setAttribute('data-thebe-loaded', 'true');
-      let thebeConfig = undefined;
-      try {
-        thebeConfig = eval(`(${el.textContent})`);
-        if (thebeConfig) {
-          console.log('loading thebe config', thebeConfig);
-          $.extend(true, _pageConfigData, thebeConfig);
-        } else {
-          console.log('No thebeConfig found in ', el);
-        }
-      } catch (e) {
-        console.error('Error loading thebe config', e, el.textContent);
-      }
-      return true;
-    });
-  }
-  return _pageConfigData[key];
-}
-
-export function mergeOptions(options) {
+function mergeOptions(options) {
   // merge options from various sources
   // call > page > defaults
   let merged = {};
-  getPageConfig();
   $.extend(true, merged, _defaultOptions);
-  $.extend(true, merged, _pageConfigData);
   if (options) $.extend(true, merged, options);
   return merged;
-}
-
-export function getOption(key) {
-  return mergeOptions()[key];
 }
 
 let _renderers = undefined;
@@ -146,8 +106,6 @@ function renderCell(element, options) {
   let mergedOptions = mergeOptions({ options });
   let $cell = $("<div class='thebelab-cell'/>");
   let $element = $(element);
-  let $output = $element.next(mergedOptions.outputSelector);
-  let source = $element.text().trim();
   let renderers = {
     initialFactories: getRenderers(mergedOptions)
   };
@@ -179,8 +137,6 @@ function renderCell(element, options) {
 
   $element.replaceWith($cell);
 
-  let $cm_element = $("<div class='thebelab-input'>");
-  $cell.append($cm_element);
   $cell.append(
     $("<button class='thebelab-button thebelab-run-button'>")
       .text('run')
@@ -193,12 +149,7 @@ function renderCell(element, options) {
       .attr('title', 'run this cell line by line')
       .click(execute_line)
   );
-  $cell.append(
-    $("<button class='thebelab-button thebelab-restart-button'>")
-      .text('restart')
-      .attr('title', 'restart the kernel')
-      .click(restart)
-  );
+
   let kernelResolve, kernelReject;
   let kernelPromise = new Promise((resolve, reject) => {
     kernelResolve = resolve;
@@ -212,19 +163,8 @@ function renderCell(element, options) {
   $cell.data('kernel-promise-resolve', kernelResolve);
   $cell.data('kernel-promise-reject', kernelReject);
 
-  if ($output.length && mergedOptions.predefinedOutput) {
-    outputArea.model.add({
-      output_type: 'display_data',
-      data: {
-        'text/html': $output.html()
-      }
-    });
-    $output.remove();
-  }
-
   function execute() {
     let kernel = $cell.data('kernel');
-    // let code = cm.getValue();
     let code = window.python_code;
     if (!kernel) {
       console.debug('No kernel connected');
@@ -244,7 +184,6 @@ function renderCell(element, options) {
 
   function execute_line() {
     let kernel = $cell.data('kernel');
-    // let code = cm.getValue();
     let code = window.python_code;
     if (!kernel) {
       console.debug('No kernel connected');
@@ -281,7 +220,6 @@ function renderCell(element, options) {
         }
       }
     });
-    console.log(execute_code);
     let modelOutput = [];
     execute_code.forEach((line, index) => {
       const delayFunc = function(number) {
@@ -297,7 +235,7 @@ function renderCell(element, options) {
             delay(() => {
               modelOutput = [...modelOutput, ...outputArea.model.toJSON()];
               outputArea.model.fromJSON(modelOutput);
-            }, 1000);
+            }, 100);
           }
         });
       };
@@ -306,39 +244,14 @@ function renderCell(element, options) {
     return false;
   }
 
-  function restart() {
-    let kernel = $cell.data('kernel');
-    if (kernel) {
-      kernelPromise.then(kernel => {
-        kernel.restart();
-      });
-    }
-  }
-
-  let theDiv = document.createElement('div');
+  const theDiv = document.createElement('div');
   $cell.append(theDiv);
   Widget.attach(outputArea, theDiv);
 
-  const mode = $element.data('language') || 'python3';
-  const required = {
-    value: source,
-    mode: mode,
-    extraKeys: {
-      'Shift-Enter': execute
-    }
-  };
-  let codeMirrorConfig = Object.assign(
-    options.codeMirrorconfig || {},
-    required
-  );
-  let cm = new CodeMirror($cm_element[0], codeMirrorConfig);
-  Mode.ensure(mode).then(modeSpec => {
-    cm.setOption('mode', mode);
-  });
   return $cell;
 }
 
-export function renderAllCells({ selector = _defaultOptions.selector } = {}) {
+function renderAllCells({ selector = _defaultOptions.selector } = {}) {
   // render all elements matching `selector` as cells.
   // by default, this is all cells with `data-executable`
 
@@ -353,8 +266,7 @@ export function renderAllCells({ selector = _defaultOptions.selector } = {}) {
   );
 }
 
-export function hookupKernel(kernel, cells) {
-  // hooks up cells to the kernel
+function hookupKernel(kernel, cells) {
   cells.map((i, cell) => {
     $(cell).data('kernel-promise-resolve')(kernel);
     return true;
@@ -362,17 +274,10 @@ export function hookupKernel(kernel, cells) {
 }
 
 // requesting Kernels
-
-export function requestKernel(kernelOptions) {
+function requestKernel(kernelOptions) {
   // request a new Kernel
   kernelOptions = mergeOptions({ kernelOptions }).kernelOptions;
   if (kernelOptions.serverSettings) {
-    let ss = kernelOptions.serverSettings;
-    // workaround bug in jupyterlab where wsUrl and baseUrl must both be set
-    // https://github.com/jupyterlab/jupyterlab/pull/4427
-    if (ss.baseUrl && !ss.wsUrl) {
-      ss.wsUrl = 'ws' + ss.baseUrl.slice(4);
-    }
     kernelOptions.serverSettings = ServerConnection.makeSettings(
       kernelOptions.serverSettings
     );
@@ -393,277 +298,19 @@ export function requestKernel(kernelOptions) {
   return p;
 }
 
-export function requestBinderKernel({ binderOptions, kernelOptions }) {
-  // request a Kernel from Binder
-  // this strings together requestBinder and requestKernel.
-  // returns a Promise for a running Kernel.
-  return requestBinder(binderOptions).then(serverSettings => {
-    kernelOptions.serverSettings = serverSettings;
-    return requestKernel(kernelOptions);
-  });
-}
-
-export function requestBinder({
-  repo,
-  ref = 'master',
-  binderUrl = null,
-  repoProvider = ''
-} = {}) {
-  // request a server from Binder
-  // returns a Promise that will resolve with a serverSettings dict
-
-  // populate from defaults
-  let defaults = mergeOptions().binderOptions;
-  if (!repo) {
-    repo = defaults.repo;
-    repoProvider = '';
-  }
-  console.log('binder url', binderUrl, defaults);
-  binderUrl = binderUrl || defaults.binderUrl;
-  ref = ref || defaults.ref;
-  let url;
-
-  if (repoProvider.toLowerCase() === 'git') {
-    // trim trailing or leading '/' on repo
-    repo = repo.replace(/(^\/)|(\/?$)/g, '');
-    // trailing / on binderUrl
-    binderUrl = binderUrl.replace(/(\/?$)/g, '');
-    //convert to URL acceptable string. Required for git
-    repo = encodeURIComponent(repo);
-
-    url = binderUrl + '/build/git/' + repo + '/' + ref;
-  } else if (repoProvider.toLowerCase() === 'gitlab') {
-    // trim gitlab.com from repo
-    repo = repo.replace(/^(https?:\/\/)?gitlab.com\//, '');
-    // trim trailing or leading '/' on repo
-    repo = repo.replace(/(^\/)|(\/?$)/g, '');
-    // trailing / on binderUrl
-    binderUrl = binderUrl.replace(/(\/?$)/g, '');
-    //convert to URL acceptable string. Required for gitlab
-    repo = encodeURIComponent(repo);
-
-    url = binderUrl + '/build/gl/' + repo + '/' + ref;
-  } else {
-    // trim github.com from repo
-    repo = repo.replace(/^(https?:\/\/)?github.com\//, '');
-    // trim trailing or leading '/' on repo
-    repo = repo.replace(/(^\/)|(\/?$)/g, '');
-    // trailing / on binderUrl
-    binderUrl = binderUrl.replace(/(\/?$)/g, '');
-
-    url = binderUrl + '/build/gh/' + repo + '/' + ref;
-  }
-  console.log('Binder build URL', url);
-  events.trigger('status', {
-    status: 'building',
-    message: 'Requesting build from binder'
-  });
-  return new Promise((resolve, reject) => {
-    let es = new EventSource(url);
-    es.onerror = err => {
-      console.error('Lost connection to ' + url, err);
-      es.close();
-      events.trigger('status', {
-        status: 'failed',
-        message: 'Lost connection to Binder',
-        error: err
-      });
-      reject(new Error(err));
-    };
-    let phase = null;
-    es.onmessage = evt => {
-      let msg = JSON.parse(evt.data);
-      if (msg.phase && msg.phase !== phase) {
-        phase = msg.phase.toLowerCase();
-        console.log('Binder phase: ' + phase);
-        let status = phase;
-        if (status === 'ready') {
-          status = 'server-ready';
-        }
-        events.trigger('status', {
-          status: status,
-          message: 'Binder is ' + phase,
-          binderMessage: msg.message
-        });
-      }
-      if (msg.message) {
-        console.log('Binder: ' + msg.message);
-      }
-      switch (msg.phase) {
-        case 'failed':
-          console.error('Failed to build', url, msg);
-          es.close();
-          reject(new Error(msg));
-          break;
-        case 'ready':
-          es.close();
-          resolve(
-            ServerConnection.makeSettings({
-              baseUrl: msg.url,
-              wsUrl: 'ws' + msg.url.slice(4),
-              token: msg.token
-            })
-          );
-          break;
-        default:
-        // console.log(msg);
-      }
-    };
-  });
-}
-
-// do it all in one go
-
 export function bootstrap(options) {
-  // bootstrap thebe on the page
-  // merge defaults, pageConfig, etc.
   options = mergeOptions(options);
-
-  if (options.preRenderHook) {
-    options.preRenderHook();
-  }
-  if (options.stripPrompts) {
-    stripPrompts(options.stripPrompts);
-  }
-  if (options.stripOutputPrompts) {
-    stripOutputPrompts(options.stripOutputPrompts);
-  }
-
-  // bootstrap thebelab on the page
-  let cells = renderAllCells({
+  const cells = renderAllCells({
     selector: options.selector
   });
-
-  function getKernel() {
-    if (options.binderOptions.repo) {
-      return requestBinderKernel({
-        binderOptions: options.binderOptions,
-        kernelOptions: options.kernelOptions
-      });
-    } else {
-      return requestKernel(options.kernelOptions);
-    }
-  }
-
-  let kernelPromise;
-  if (options.requestKernel) {
-    kernelPromise = getKernel();
-  } else {
-    kernelPromise = new Promise((resolve, reject) => {
-      events.one('request-kernel', () => {
-        getKernel()
-          .then(resolve)
-          .catch(reject);
-      });
-    });
-  }
-
+  const kernelPromise = requestKernel(options.kernelOptions);
   kernelPromise.then(session => {
-    let kernel = session.kernel;
+    const kernel = session.kernel;
     // debug
-    if (typeof window !== 'undefined') window.thebeKernel = kernel;
+    if (typeof window !== 'undefined') {
+      window.thebeKernel = kernel;
+    }
     hookupKernel(kernel, cells);
   });
   return kernelPromise;
-}
-
-function splitCell(element, { inPrompt, continuationPrompt } = {}) {
-  let rawText = element.text().trim();
-  if (rawText.indexOf(inPrompt) === -1) {
-    return element;
-  }
-  let cells = [];
-  let cell = null;
-  rawText.split('\n').map(line => {
-    line = line.trim();
-    if (line.slice(0, inPrompt.length) === inPrompt) {
-      // line with a prompt
-      line = line.slice(inPrompt.length) + '\n';
-      if (cell) {
-        cell += line;
-      } else {
-        cell = line;
-      }
-    } else if (
-      continuationPrompt &&
-      line.slice(0, continuationPrompt.length) === continuationPrompt
-    ) {
-      // line with a continuation prompt
-      cell += line.slice(continuationPrompt.length) + '\n';
-    } else {
-      // output line
-      if (cell) {
-        cells.push(cell);
-        cell = null;
-      }
-    }
-    return true;
-  });
-  if (cell) {
-    cells.push(cell);
-  }
-  // console.log("cells: ", cells);
-  // clear the parent element
-  element.html('');
-  // add the thebe-able cells
-  cells.map(cell => {
-    element.append(
-      $('<pre>')
-        .text(cell)
-        .attr('data-executable', 'true')
-    );
-    return true;
-  });
-}
-
-function splitCellOutputPrompt(element, { outPrompt } = {}) {
-  let rawText = element.text().trim();
-  if (rawText.indexOf(outPrompt) === -1) {
-    return element;
-  }
-  let cells = [];
-  let cell = null;
-  rawText.split('\n').map(line => {
-    line = line.trim();
-    if (line.slice(0, outPrompt.length) === outPrompt) {
-      // output line
-      if (cell) {
-        cells.push(cell);
-        cell = null;
-      }
-    } else {
-      // input line
-      if (cell) {
-        cell += line + '\n';
-      } else {
-        cell = line + '\n';
-      }
-    }
-    return true;
-  });
-  if (cell) {
-    cells.push(cell);
-  }
-  // console.log("cells: ", cells);
-  // clear the parent element
-  element.html('');
-  // add the thebe-able cells
-  cells.map(cell => {
-    element.append(
-      $('<pre>')
-        .text(cell)
-        .attr('data-executable', 'true')
-    );
-    return true;
-  });
-}
-
-export function stripPrompts(options) {
-  // strip prompts from a
-  $(options.selector).map((i, el) => splitCell($(el), options));
-}
-
-export function stripOutputPrompts(options) {
-  // strip prompts from a
-  $(options.selector).map((i, el) => splitCellOutputPrompt($(el), options));
 }
