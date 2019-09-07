@@ -11,39 +11,32 @@ import {
 } from 'monaco-languageclient';
 import normalizeUrl from 'normalize-url';
 import ReconnectingWebSocket from 'reconnecting-websocket';
+import delay from 'lodash/delay';
+import * as thebelab from './thebelab';
 
-class App extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      code: `# Type your code here
+const deafultCode = `# Type your code here
 import random
 
 
 def print_random():
-    print(print(random.randint(1, 10)))
+    print(random.randint(1, 10))
 
 
 print('hello world')
 print('aaaa')
-print_random()`
-    };
-  }
+print_random()`;
 
-  editorDidMount(editor, monaco) {
-    window.editor = editor;
-    window.monaco = monaco;
-    monaco.languages.register({
-      id: 'python',
-      extensions: ['.py'],
-      aliases: ['PYTHON', 'python'],
-      mimetypes: ['application/json']
-    });
-    MonacoServices.install(editor);
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.code = deafultCode;
+    this.codeBlocks = [];
+    this.executedLine = null;
+    this.showExecutedLine = false;
+    this.deltaDecorations = [];
   }
 
   componentDidMount() {
-    window.python_code = this.state.code;
     const url = createUrl('/pyls');
     const webSocket = createWebSocket(url);
     // listen when the web socket is opened
@@ -58,26 +51,156 @@ print_random()`
     });
   }
 
-  onChange(newValue, e) {
-    console.log('onChange', newValue, e);
-    window.python_code = newValue;
-  }
+  editorDidMount = (editor, monaco) => {
+    window.editor = editor;
+    window.monaco = monaco;
+    this.editor = editor;
+    this.monaco = monaco;
+    this.editor.getModel().updateOptions({ tabSize: 4 });
+    monaco.languages.register({
+      id: 'python',
+      extensions: ['.py'],
+      aliases: ['PYTHON', 'python'],
+      mimetypes: ['application/json']
+    });
+    MonacoServices.install(editor);
+    thebelab.bootstrap();
+  };
+
+  onChange = (newValue, e) => {
+    this.code = newValue;
+  };
+
+  getCodeBlocks = () => {
+    const code = this.code;
+    const lines = code.split('\n');
+    let buffer = [];
+    const codeBlocks = [];
+    lines.forEach((line, index) => {
+      if (line.trim().length === 0 || line.startsWith('#')) {
+        return;
+      }
+      if (buffer.length === 0) {
+        if (index === lines.length - 1 || !line.endsWith(':')) {
+          codeBlocks.push({ lineNo: index + 1, code: line });
+        } else if (line.endsWith(':')) {
+          buffer.push({ lineNo: index + 1, code: line });
+        }
+        return;
+      } else {
+        if (line.startsWith(' ')) {
+          buffer.push({ lineNo: index + 1, code: line });
+        } else {
+          codeBlocks.push({
+            lineNo: buffer[0].lineNo,
+            code: buffer.map(b => b.code).join('\n')
+          });
+          buffer = [];
+          codeBlocks.push({ lineNo: index + 1, code: line });
+        }
+      }
+    });
+    return codeBlocks;
+  };
+
+  runCode = () => {
+    const kernel = window.thebeKernel;
+    const outputArea = window.outputArea;
+    this.codeBlocks = this.getCodeBlocks();
+    const code = this.codeBlocks.map(b => b.code).join('\n');
+    outputArea.future = kernel.requestExecute({ code: code });
+  };
+
+  runCodeLineByLine = () => {
+    const kernel = window.thebeKernel;
+    const outputArea = window.outputArea;
+    this.codeBlocks = this.getCodeBlocks();
+    if (this.executedLine === null) {
+      this.showExecutedLine = true;
+      this.executedLine = 0;
+    } else if (this.executedLine >= this.codeBlocks.length - 1) {
+      return;
+    } else {
+      this.executedLine += 1;
+    }
+    const block = this.codeBlocks[this.executedLine];
+    this.showLineDecoration(block.lineNo);
+    outputArea.future = kernel.requestExecute({ code: block.code });
+    if (this.executedLine === this.codeBlocks.length - 1) {
+      delay(this.restartEditor, 500);
+    }
+  };
+
+  restartEditor = () => {
+    this.codeBlocks = [];
+    this.executedLine = null;
+    this.showExecutedLine = false;
+    this.hideLineDecoration();
+  };
+
+  restartKernel = () => {
+    const kernel = window.thebeKernel;
+    if (kernel) {
+      kernel.restart();
+    }
+  };
+
+  showLineDecoration = lineno => {
+    this.deltaDecorations = this.editor.deltaDecorations(
+      this.deltaDecorations,
+      [
+        {
+          range: new this.monaco.Range(lineno, 1, lineno, 1),
+          options: {
+            isWholeLine: true,
+            className: 'bg-kov-orange'
+          }
+        }
+      ]
+    );
+    this.editor.revealLineInCenter(lineno);
+  };
+
+  hideLineDecoration = () => {
+    this.deltaDecorations = this.editor.deltaDecorations(
+      this.deltaDecorations,
+      []
+    );
+  };
+
   render() {
-    const code = this.state.code;
+    const code = this.code;
     const options = {
       selectOnLineNumbers: true
     };
     return (
-      <MonacoEditor
-        width="800"
-        height="600"
-        language="python"
-        theme="vs"
-        value={code}
-        options={options}
-        onChange={this.onChange}
-        editorDidMount={this.editorDidMount}
-      />
+      <div>
+        <MonacoEditor
+          width="800"
+          height="600"
+          language="python"
+          theme="vs"
+          value={code}
+          options={options}
+          onChange={this.onChange}
+          editorDidMount={this.editorDidMount}
+        />
+        <div className="mb-3">
+          <button className="btn btn-primary" onClick={this.runCode}>
+            Run
+          </button>
+          <button className="btn btn-success" onClick={this.runCodeLineByLine}>
+            Run line
+          </button>
+          <button className="btn btn-danger" onClick={this.restartEditor}>
+            Restart Editor
+          </button>
+          <button className="btn btn-danger" onClick={this.restartKernel}>
+            Restart Kernel
+          </button>
+        </div>
+        <div id="output-area" />
+      </div>
     );
   }
 }

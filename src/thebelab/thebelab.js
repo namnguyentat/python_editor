@@ -27,7 +27,6 @@ import './index.css';
 
 import * as base from '@jupyter-widgets/base';
 import * as controls from '@jupyter-widgets/controls';
-import delay from 'lodash/delay';
 
 if (typeof window !== 'undefined' && typeof window.define !== 'undefined') {
   window.define('@jupyter-widgets/base', base);
@@ -98,15 +97,13 @@ function getRenderers(options) {
   }
   return _renderers;
 }
-// rendering cells
 
 function renderCell(element, options) {
   // render a single cell
   // element should be a `<pre>` tag with some code in it
-  let mergedOptions = mergeOptions({ options });
-  let $cell = $("<div class='thebelab-cell'/>");
-  let $element = $(element);
-  let renderers = {
+  const $cell = $('#output-area');
+  const mergedOptions = mergeOptions({ options });
+  const renderers = {
     initialFactories: getRenderers(mergedOptions)
   };
   if (mergedOptions.mathjaxUrl) {
@@ -115,9 +112,9 @@ function renderCell(element, options) {
       config: mergedOptions.mathjaxConfig
     });
   }
-  let renderMime = new RenderMimeRegistry(renderers);
-
-  let manager = options.manager;
+  const model = new OutputAreaModel({ trusted: true });
+  const renderMime = new RenderMimeRegistry(renderers);
+  const manager = options.manager;
 
   renderMime.addFactory(
     {
@@ -128,121 +125,12 @@ function renderCell(element, options) {
     1
   );
 
-  let model = new OutputAreaModel({ trusted: true });
-
-  let outputArea = new OutputArea({
+  const outputArea = new OutputArea({
     model: model,
     rendermime: renderMime
   });
 
-  $element.replaceWith($cell);
-
-  $cell.append(
-    $("<button class='thebelab-button thebelab-run-button'>")
-      .text('run')
-      .attr('title', 'run this cell')
-      .click(execute)
-  );
-  $cell.append(
-    $("<button class='thebelab-button thebelab-run-line-button'>")
-      .text('run line')
-      .attr('title', 'run this cell line by line')
-      .click(execute_line)
-  );
-
-  let kernelResolve, kernelReject;
-  let kernelPromise = new Promise((resolve, reject) => {
-    kernelResolve = resolve;
-    kernelReject = reject;
-  });
-  kernelPromise.then(kernel => {
-    $cell.data('kernel', kernel);
-    manager.registerWithKernel(kernel);
-    return kernel;
-  });
-  $cell.data('kernel-promise-resolve', kernelResolve);
-  $cell.data('kernel-promise-reject', kernelReject);
-
-  function execute() {
-    let kernel = $cell.data('kernel');
-    let code = window.python_code;
-    if (!kernel) {
-      console.debug('No kernel connected');
-      outputArea.model.clear();
-      outputArea.model.add({
-        output_type: 'stream',
-        name: 'stdout',
-        text: 'Waiting for kernel...'
-      });
-      events.trigger('request-kernel');
-    }
-    kernelPromise.then(kernel => {
-      outputArea.future = kernel.requestExecute({ code: code });
-    });
-    return false;
-  }
-
-  function execute_line() {
-    let kernel = $cell.data('kernel');
-    let code = window.python_code;
-    if (!kernel) {
-      console.debug('No kernel connected');
-      outputArea.model.clear();
-      outputArea.model.add({
-        output_type: 'stream',
-        name: 'stdout',
-        text: 'Waiting for kernel...'
-      });
-      events.trigger('request-kernel');
-    }
-    const lines = code
-      .split('\n')
-      .filter(line => line.trim().length > 0 && !line.startsWith('#'));
-    let buffer = [];
-    const execute_code = [];
-    lines.forEach((line, index) => {
-      if (buffer.length === 0) {
-        if (index === lines.length - 1) {
-          execute_code.push(line);
-        } else if (line.endsWith(':')) {
-          buffer.push(line);
-        } else {
-          execute_code.push(line);
-        }
-        return;
-      } else {
-        if (line.startsWith(' ')) {
-          buffer.push(line);
-        } else {
-          execute_code.push(buffer.join('\n'));
-          buffer = [];
-          execute_code.push(line);
-        }
-      }
-    });
-    let modelOutput = [];
-    execute_code.forEach((line, index) => {
-      const delayFunc = function(number) {
-        kernelPromise.then(kernel => {
-          if (number === 0) {
-            outputArea.model.clear();
-            modelOutput = [];
-          } else {
-            modelOutput = [...modelOutput, ...outputArea.model.toJSON()];
-          }
-          outputArea.future = kernel.requestExecute({ code: line });
-          if (number === execute_code.length - 1) {
-            delay(() => {
-              modelOutput = [...modelOutput, ...outputArea.model.toJSON()];
-              outputArea.model.fromJSON(modelOutput);
-            }, 100);
-          }
-        });
-      };
-      delay(delayFunc.bind(this, index), index * 500);
-    });
-    return false;
-  }
+  window.outputArea = outputArea;
 
   const theDiv = document.createElement('div');
   $cell.append(theDiv);
@@ -264,13 +152,6 @@ function renderAllCells({ selector = _defaultOptions.selector } = {}) {
       manager: manager
     })
   );
-}
-
-function hookupKernel(kernel, cells) {
-  cells.map((i, cell) => {
-    $(cell).data('kernel-promise-resolve')(kernel);
-    return true;
-  });
 }
 
 // requesting Kernels
@@ -300,17 +181,13 @@ function requestKernel(kernelOptions) {
 
 export function bootstrap(options) {
   options = mergeOptions(options);
-  const cells = renderAllCells({
+  renderAllCells({
     selector: options.selector
   });
   const kernelPromise = requestKernel(options.kernelOptions);
   kernelPromise.then(session => {
     const kernel = session.kernel;
-    // debug
-    if (typeof window !== 'undefined') {
-      window.thebeKernel = kernel;
-    }
-    hookupKernel(kernel, cells);
+    window.thebeKernel = kernel;
   });
   return kernelPromise;
 }
