@@ -89,44 +89,51 @@ class NormalEditor extends React.Component {
     const code = this.code;
     const lines = code.split('\n');
     let buffer = [];
-    const codeBlocks = [];
+    let codeBlocks = [];
     codeBlocks.push({
       lineNo: null,
       code: 'from IPython.core.debugger import set_trace'
     });
     lines.forEach((line, index) => {
-      if (line.trim().length === 0 || line.startsWith('#')) {
+      if (
+        line.trim().length === 0 ||
+        line.trim().startsWith('#') ||
+        line.trim().startsWith('%')
+      ) {
         return;
       }
+      const lineNoInfo = `# lineNo:${index + 1}`;
+      const setTrace = 'set_trace()';
       if (buffer.length === 0) {
-        if (index === lines.length - 1 || !line.endsWith(':')) {
-          codeBlocks.push({
-            lineNo: null,
-            code: `set_trace()# lineNo:${index + 1}`
-          });
-          codeBlocks.push({
-            lineNo: index + 1,
-            code: line + `# lineNo:${index + 1}`
-          });
-        } else if (line.endsWith(':')) {
+        if (line.endsWith(':')) {
           buffer.push({
             lineNo: index + 1,
-            code: line + `# lineNo:${index + 1}`
+            code: line + lineNoInfo
           });
+        } else {
+          codeBlocks = codeBlocks.concat([
+            {
+              lineNo: null,
+              code: setTrace + lineNoInfo
+            },
+            {
+              lineNo: index + 1,
+              code: line + lineNoInfo
+            }
+          ]);
         }
-        return;
       } else {
         if (line.startsWith(' ')) {
-          const spaceCount = line.search(/\S/);
           if (!line.endsWith(':')) {
+            const spaceCount = line.search(/\S/);
             buffer.push({
               lineNo: null,
-              code: `${' '.repeat(spaceCount)}set_trace()# lineNo:${index + 1}`
+              code: `${' '.repeat(spaceCount)}set_trace()${lineNoInfo}`
             });
           }
           buffer.push({
             lineNo: index + 1,
-            code: line + `# lineNo:${index + 1}`
+            code: line + lineNoInfo
           });
         } else {
           codeBlocks.push({
@@ -137,17 +144,19 @@ class NormalEditor extends React.Component {
           if (line.endsWith(':')) {
             buffer.push({
               lineNo: index + 1,
-              code: line + `# lineNo:${index + 1}`
+              code: line + lineNoInfo
             });
           } else {
-            codeBlocks.push({
-              lineNo: null,
-              code: `set_trace()# lineNo:${index + 1}`
-            });
-            codeBlocks.push({
-              lineNo: index + 1,
-              code: line + `# lineNo:${index + 1}`
-            });
+            codeBlocks = codeBlocks.concat([
+              {
+                lineNo: null,
+                code: setTrace + lineNoInfo
+              },
+              {
+                lineNo: index + 1,
+                code: line + lineNoInfo
+              }
+            ]);
           }
         }
       }
@@ -190,6 +199,7 @@ class NormalEditor extends React.Component {
   };
 
   getLineNoAndShowDecoration = () => {
+    const kernel = window.thebeKernel;
     const output = $('#output-area')
       .text()
       .split('\n');
@@ -208,6 +218,7 @@ class NormalEditor extends React.Component {
       this.showLineDecoration(lineNo);
     } else {
       this.restartEditor();
+      kernel.sendInputReply({ status: 'ok', value: 'q' });
     }
     this.isWaitingServer = false;
   };
