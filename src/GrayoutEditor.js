@@ -41,9 +41,11 @@ class GrayoutEditor extends React.Component {
   };
 
   onChange = (newValue, e) => {
-    this.code = newValue;
     if (this.isShowingDecoration) {
       this.hideLineDecoration();
+      this.forceUpdate();
+    } else {
+      this.code = newValue;
     }
   };
 

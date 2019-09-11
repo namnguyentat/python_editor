@@ -1,6 +1,7 @@
 import React from 'react';
 import NormalEditor from './NormalEditor';
 import GrayoutEditor from './GrayoutEditor';
+import WormEatenEditor from './WormEatenEditor';
 import './App.css';
 
 class App extends React.Component {
@@ -26,15 +27,22 @@ class App extends React.Component {
           >
             Normal
           </button>
-          {/* <button
+          <button
             className="btn btn-default"
             onClick={() => this._switchToMode('grayout')}
           >
             Grayout
-          </button> */}
+          </button>
+          <button
+            className="btn btn-default"
+            onClick={() => this._switchToMode('worm_eaten')}
+          >
+            Worm eaten
+          </button>
         </div>
         {mode === 'normal' && <NormalEditor />}
         {mode === 'grayout' && <GrayoutEditor />}
+        {mode === 'worm_eaten' && <WormEatenEditor />}
       </div>
     );
   }
