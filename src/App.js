@@ -26,12 +26,12 @@ class App extends React.Component {
           >
             Normal
           </button>
-          <button
+          {/* <button
             className="btn btn-default"
             onClick={() => this._switchToMode('grayout')}
           >
             Grayout
-          </button>
+          </button> */}
         </div>
         {mode === 'normal' && <NormalEditor />}
         {mode === 'grayout' && <GrayoutEditor />}

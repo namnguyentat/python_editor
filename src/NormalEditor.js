@@ -12,6 +12,7 @@ import normalizeUrl from 'normalize-url';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import delay from 'lodash/delay';
 import * as thebelab from './thebelab';
+import $ from 'jquery';
 
 const deafultCode = `# Type your code here
 import random
@@ -19,11 +20,23 @@ import random
 
 def print_random():
     print(random.randint(1, 10))
+    print_hello()
+    print(random.randint(1, 10))
+    print_hello()
+    return 4
+
+
+def print_hello():
+    if True:
+        print('Hello')
+        if True:
+            print('World')
 
 
 print('hello world')
 print('aaaa')
-print_random()`;
+print_random()
+`;
 
 class NormalEditor extends React.Component {
   constructor(props) {
@@ -33,6 +46,8 @@ class NormalEditor extends React.Component {
     this.executedLine = null;
     this.showExecutedLine = false;
     this.deltaDecorations = [];
+    this.startRunLinByLine = false;
+    this.isWaitingServer = false;
   }
 
   componentDidMount() {
@@ -75,73 +90,143 @@ class NormalEditor extends React.Component {
     const lines = code.split('\n');
     let buffer = [];
     const codeBlocks = [];
+    codeBlocks.push({
+      lineNo: null,
+      code: 'from IPython.core.debugger import set_trace'
+    });
     lines.forEach((line, index) => {
       if (line.trim().length === 0 || line.startsWith('#')) {
         return;
       }
       if (buffer.length === 0) {
         if (index === lines.length - 1 || !line.endsWith(':')) {
-          codeBlocks.push({ lineNo: index + 1, code: line });
+          codeBlocks.push({
+            lineNo: null,
+            code: `set_trace()# lineNo:${index + 1}`
+          });
+          codeBlocks.push({
+            lineNo: index + 1,
+            code: line + `# lineNo:${index + 1}`
+          });
         } else if (line.endsWith(':')) {
-          buffer.push({ lineNo: index + 1, code: line });
+          buffer.push({
+            lineNo: index + 1,
+            code: line + `# lineNo:${index + 1}`
+          });
         }
         return;
       } else {
         if (line.startsWith(' ')) {
-          buffer.push({ lineNo: index + 1, code: line });
+          const spaceCount = line.search(/\S/);
+          if (!line.endsWith(':')) {
+            buffer.push({
+              lineNo: null,
+              code: `${' '.repeat(spaceCount)}set_trace()# lineNo:${index + 1}`
+            });
+          }
+          buffer.push({
+            lineNo: index + 1,
+            code: line + `# lineNo:${index + 1}`
+          });
         } else {
           codeBlocks.push({
             lineNo: buffer[0].lineNo,
             code: buffer.map(b => b.code).join('\n')
           });
           buffer = [];
-          codeBlocks.push({ lineNo: index + 1, code: line });
+          if (line.endsWith(':')) {
+            buffer.push({
+              lineNo: index + 1,
+              code: line + `# lineNo:${index + 1}`
+            });
+          } else {
+            codeBlocks.push({
+              lineNo: null,
+              code: `set_trace()# lineNo:${index + 1}`
+            });
+            codeBlocks.push({
+              lineNo: index + 1,
+              code: line + `# lineNo:${index + 1}`
+            });
+          }
         }
       }
+      if (index === lines.length - 1 && buffer.length > 0) {
+        codeBlocks.push({
+          lineNo: buffer[0].lineNo,
+          code: buffer.map(b => b.code).join('\n')
+        });
+      }
     });
+    console.log(codeBlocks);
+    console.log(codeBlocks.map(b => b.code).join('\n'));
     return codeBlocks;
   };
 
   runCode = () => {
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
-    this.codeBlocks = this.getCodeBlocks();
-    const code = this.codeBlocks.map(b => b.code).join('\n');
+    const code = this.code;
     outputArea.future = kernel.requestExecute({ code: code });
   };
 
   runCodeLineByLine = () => {
+    if (this.isWaitingServer) {
+      return;
+    }
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
-    this.codeBlocks = this.getCodeBlocks();
-    if (this.executedLine === null) {
-      this.showExecutedLine = true;
-      this.executedLine = 0;
-    } else if (this.executedLine >= this.codeBlocks.length - 1) {
-      return;
+    outputArea.model.clear();
+    if (!this.startRunLinByLine) {
+      this.startRunLinByLine = true;
+      this.codeBlocks = this.getCodeBlocks();
+      const code = this.codeBlocks.map(b => b.code).join('\n');
+      outputArea.future = kernel.requestExecute({ code: code });
     } else {
-      this.executedLine += 1;
+      kernel.sendInputReply({ status: 'ok', value: 'c' });
     }
-    const block = this.codeBlocks[this.executedLine];
-    this.showLineDecoration(block.lineNo);
-    outputArea.future = kernel.requestExecute({ code: block.code });
-    if (this.executedLine === this.codeBlocks.length - 1) {
-      delay(this.restartEditor, 500);
+    this.isWaitingServer = true;
+    delay(this.getLineNoAndShowDecoration, 100);
+  };
+
+  getLineNoAndShowDecoration = () => {
+    const output = $('#output-area')
+      .text()
+      .split('\n');
+    let lineNo = null;
+    output.forEach((line, index) => {
+      if (line.startsWith('--->') || line.startsWith('---->')) {
+        console.log('line', line);
+        lineNo = line.split('# lineNo:')[1];
+        lineNo = parseInt(lineNo);
+        if (!Number.isInteger(lineNo)) {
+          lineNo = null;
+        }
+      }
+    });
+    if (lineNo) {
+      this.showLineDecoration(lineNo);
+    } else {
+      this.restartEditor();
     }
+    this.isWaitingServer = false;
   };
 
   restartEditor = () => {
     this.codeBlocks = [];
     this.executedLine = null;
     this.showExecutedLine = false;
+    this.startRunLinByLine = false;
+    this.isWaitingServer = false;
     this.hideLineDecoration();
   };
 
   restartKernel = () => {
     const kernel = window.thebeKernel;
     if (kernel) {
-      kernel.restart();
+      kernel.restart().catch(e => console.error(e));
     }
+    this.restartEditor();
   };
 
   showLineDecoration = lineno => {
@@ -190,9 +275,6 @@ class NormalEditor extends React.Component {
           </button>
           <button className="btn btn-success" onClick={this.runCodeLineByLine}>
             Run line
-          </button>
-          <button className="btn btn-danger" onClick={this.restartEditor}>
-            Restart Editor
           </button>
           <button className="btn btn-danger" onClick={this.restartKernel}>
             Restart Kernel

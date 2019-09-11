@@ -20,3 +20,7 @@
 .color-kov-gray {
   color: gray !important;
 }
+
+.jp-Stdin-prompt {
+  display: none !important;
+}
