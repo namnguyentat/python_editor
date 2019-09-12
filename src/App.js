@@ -21,7 +21,7 @@ class App extends React.Component {
     return (
       <div>
         <div className="mb-3 mt-3">
-          <button
+          {/* <button
             className="btn btn-primary"
             onClick={() => this._switchToMode('normal')}
           >
@@ -38,7 +38,7 @@ class App extends React.Component {
             onClick={() => this._switchToMode('worm_eaten')}
           >
             Worm eaten
-          </button>
+          </button> */}
         </div>
         {mode === 'normal' && <NormalEditor />}
         {mode === 'grayout' && <GrayoutEditor />}

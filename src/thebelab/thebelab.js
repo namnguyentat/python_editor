@@ -130,11 +130,11 @@ function renderCell(element, options) {
     rendermime: renderMime
   });
 
-  window.outputArea = outputArea;
-
   const theDiv = document.createElement('div');
   $cell.append(theDiv);
   Widget.attach(outputArea, theDiv);
+
+  window.outputArea = outputArea;
 
   return $cell;
 }

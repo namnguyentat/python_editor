@@ -11,11 +11,67 @@ import {
 import normalizeUrl from 'normalize-url';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import delay from 'lodash/delay';
+import defer from 'lodash/defer';
 import * as thebelab from './thebelab';
 import $ from 'jquery';
 
+const printVarListCode = `import json
+from sys import getsizeof
+
+from IPython import get_ipython
+from IPython.core.magics.namespace import NamespaceMagics
+
+_nms = NamespaceMagics()
+_Jupyter = get_ipython()
+_nms.shell = _Jupyter.kernel.shell
+
+try:
+    import numpy as np  # noqa: F401
+except ImportError:
+    pass
+
+
+def _getsizeof(x):
+    # return the size of variable x. Amended version of sys.getsizeof
+    # which also supports ndarray, Series and DataFrame
+    if type(x).__name__ in ['ndarray', 'Series']:
+        return x.nbytes
+    elif type(x).__name__ == 'DataFrame':
+        return x.memory_usage().sum()
+    else:
+        return getsizeof(x)
+
+
+def _getshapeof(x):
+    # returns the shape of x if it has one
+    # returns None otherwise - might want to return an empty string for an empty collum
+    try:
+        return x.shape
+    except AttributeError:  # x does not have a shape
+        return None
+
+
+def var_dic_list():
+    types_to_exclude = ['module', 'function', 'builtin_function_or_method',
+                        'instance', '_Feature', 'type', 'ufunc']
+    values = _nms.who_ls()
+    vardic = [{'varName': v, 'varType': type(eval(v)).__name__, 'varSize': str(_getsizeof(eval(v))), 'varShape': str(_getshapeof(eval(v))) if _getshapeof(eval(v)) else '', 'varContent': str(eval(v))[:200]}  # noqa
+
+    for v in values if (v not in ['_html', '_nms', 'NamespaceMagics', '_Jupyter']) & (type(eval(v)).__name__ not in types_to_exclude)]  # noqa
+    return json.dumps(vardic)
+
+
+# command to refresh the list of variables
+print(var_dic_list())
+`;
+
 const deafultCode = `# Type your code here
 import random
+
+a = 1
+b = True
+c = 'String'
+d = [1, 2, 3]
 
 
 def print_random():
@@ -48,6 +104,8 @@ class NormalEditor extends React.Component {
     this.deltaDecorations = [];
     this.startRunLinByLine = false;
     this.isWaitingServer = false;
+    this.stdOut = null;
+    this.varList = null;
   }
 
   componentDidMount() {
@@ -173,16 +231,25 @@ class NormalEditor extends React.Component {
   };
 
   runCode = () => {
+    $('#output-area').show();
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
     const code = this.code;
+    kernel.requestExecute({ code: printVarListCode });
     outputArea.future = kernel.requestExecute({ code: code });
+  };
+
+  finish = () => {
+    const kernel = window.thebeKernel;
+    kernel.sendInputReply({ status: 'ok', value: 'q' });
+    this.restartEditor();
   };
 
   runCodeLineByLine = () => {
     if (this.isWaitingServer) {
       return;
     }
+    $('#output-area').hide();
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
     outputArea.model.clear();
@@ -190,37 +257,64 @@ class NormalEditor extends React.Component {
       this.startRunLinByLine = true;
       this.codeBlocks = this.getCodeBlocks();
       const code = this.codeBlocks.map(b => b.code).join('\n');
+      kernel.requestExecute({ code: printVarListCode });
       outputArea.future = kernel.requestExecute({ code: code });
     } else {
       kernel.sendInputReply({ status: 'ok', value: 'c' });
     }
     this.isWaitingServer = true;
+    delay(() => {
+      kernel.sendInputReply({
+        status: 'ok',
+        value: 'print(var_dic_list())'
+      });
+    }, 50);
     delay(this.getLineNoAndShowDecoration, 100);
   };
 
   getLineNoAndShowDecoration = () => {
-    const kernel = window.thebeKernel;
-    const output = $('#output-area')
-      .text()
-      .split('\n');
-    let lineNo = null;
-    output.forEach((line, index) => {
-      if (line.startsWith('--->') || line.startsWith('---->')) {
-        console.log('line', line);
-        lineNo = line.split('# lineNo:')[1];
-        lineNo = parseInt(lineNo);
-        if (!Number.isInteger(lineNo)) {
-          lineNo = null;
+    let index = 0;
+    // const kernel = window.thebeKernel;
+    const outputArea = window.outputArea;
+    const func = () => {
+      if (outputArea.model.toJSON().length === 0) {
+        if (index < 10) {
+          index += 1;
+          delay(func, 10);
+        } else {
+          this.restartEditor();
         }
+        return;
       }
-    });
-    if (lineNo) {
-      this.showLineDecoration(lineNo);
-    } else {
-      this.restartEditor();
-      kernel.sendInputReply({ status: 'ok', value: 'q' });
-    }
-    this.isWaitingServer = false;
+      const output = $('#output-area')
+        .text()
+        .split('\n');
+      let lineNo = null;
+      output.forEach((line, index) => {
+        if (line.startsWith('--->') || line.startsWith('---->')) {
+          console.log('line', line);
+          lineNo = line.split('# lineNo:')[1];
+          lineNo = parseInt(lineNo);
+          if (!Number.isInteger(lineNo)) {
+            lineNo = null;
+          }
+        }
+        if (line.startsWith('> <ipython-input')) {
+          this.stdOut = output.slice(0, index).join('\n');
+        }
+        if (line.startsWith('[{"varName":')) {
+          this.varList = JSON.parse(line);
+        }
+      });
+      if (lineNo) {
+        this.showLineDecoration(lineNo);
+        defer(() => this.forceUpdate());
+      } else {
+        this.hideLineDecoration();
+      }
+      this.isWaitingServer = false;
+    };
+    func();
   };
 
   restartEditor = () => {
@@ -229,15 +323,17 @@ class NormalEditor extends React.Component {
     this.showExecutedLine = false;
     this.startRunLinByLine = false;
     this.isWaitingServer = false;
+    this.stdOut = null;
+    this.varList = null;
     this.hideLineDecoration();
   };
 
   restartKernel = () => {
+    this.restartEditor();
     const kernel = window.thebeKernel;
     if (kernel) {
       kernel.restart().catch(e => console.error(e));
     }
-    this.restartEditor();
   };
 
   showLineDecoration = lineno => {
@@ -253,7 +349,7 @@ class NormalEditor extends React.Component {
         }
       ]
     );
-    this.editor.revealLineInCenter(lineno);
+    // this.editor.revealLineInCenter(lineno);
   };
 
   hideLineDecoration = () => {
@@ -287,9 +383,34 @@ class NormalEditor extends React.Component {
           <button className="btn btn-success" onClick={this.runCodeLineByLine}>
             Run line
           </button>
+          <button className="btn btn-success" onClick={this.finish}>
+            Finish
+          </button>
           <button className="btn btn-danger" onClick={this.restartKernel}>
             Restart Kernel
           </button>
+        </div>
+        <div>
+          <h3>Output</h3>
+          {this.stdOut && <pre>{this.stdOut}</pre>}
+        </div>
+        <div>
+          <h3>Variable Inspector</h3>
+          {this.varList && (
+            <table className="table table-sm table-striped">
+              <tbody>
+                {this.varList.map(variable => {
+                  return (
+                    <tr>
+                      <td>{variable.varName}</td>
+                      <td>{variable.varType}</td>
+                      <td>{variable.varContent}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
         <div id="output-area" />
       </div>
