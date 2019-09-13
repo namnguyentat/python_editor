@@ -24,3 +24,14 @@
 .jp-Stdin-prompt {
   display: none !important;
 }
+
+.comment-content-widget {
+  white-space: nowrap;
+  /* visibility: hidden !important; */
+  background-color: #5e82a4;
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 2px;
+  font-size: 12px;
+  box-shadow: 0 8px 16px 0 rgba(94, 130, 164, 0.3);
+}

@@ -10,8 +10,6 @@ import {
 } from 'monaco-languageclient';
 import normalizeUrl from 'normalize-url';
 import ReconnectingWebSocket from 'reconnecting-websocket';
-import delay from 'lodash/delay';
-import defer from 'lodash/defer';
 import * as thebelab from './thebelab';
 import $ from 'jquery';
 
@@ -226,12 +224,12 @@ class NormalEditor extends React.Component {
         });
       }
     });
-    console.log(codeBlocks);
     console.log(codeBlocks.map(b => b.code).join('\n'));
     return codeBlocks;
   };
 
   runCode = () => {
+    this.restartEditor();
     $('#output-area').show();
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
@@ -263,71 +261,113 @@ class NormalEditor extends React.Component {
     if (this.isWaitingServer) {
       return;
     }
-    $('#output-area').hide();
+    $('#output-area').show();
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
     outputArea.model.clear();
     if (!this.startRunLinByLine) {
+      this.restartEditor();
       this.startRunLinByLine = true;
       this.codeBlocks = this.getCodeBlocks();
       const code = this.codeBlocks.map(b => b.code).join('\n');
-      kernel.requestExecute({ code: printVarListCode });
-      outputArea.future = kernel.requestExecute({ code: code }, false);
+      let printVarFuture = kernel.requestExecute({ code: printVarListCode });
+      printVarFuture.done.then(() => {
+        let future = kernel.requestExecute({ code: code });
+        future.onIOPub = msg => {
+          // IDLE status
+          if (
+            msg.msg_type === 'status' &&
+            msg.content.execution_state === 'idle'
+          ) {
+            this.hideLineDecoration();
+            this.startRunLinByLine = false;
+            this.isWaitingServer = false;
+            return;
+          }
+
+          // Execute Result
+          if (msg.msg_type === 'execute_result') {
+            this.isWaitingServer = false;
+            if (msg.content.data && msg.content.data['text/plain']) {
+              this.setState({ stdOut: msg.content.data['text/plain'] });
+            }
+            outputArea.model.fromJSON([
+              {
+                data: msg.content.data,
+                metadata: msg.content.metadata,
+                output_type: 'execute_result'
+              }
+            ]);
+            return;
+          }
+
+          // Display Data
+          if (msg.msg_type === 'display_data') {
+            this.isWaitingServer = false;
+            outputArea.model.fromJSON([
+              {
+                data: msg.content.data,
+                metadata: msg.content.metadata,
+                output_type: 'display_data'
+              }
+            ]);
+            return;
+          }
+
+          // Stream
+          if (
+            msg.msg_type === 'stream' &&
+            msg.content.name === 'stdout' &&
+            msg.content.text
+          ) {
+            if (
+              msg.content.text.startsWith('[{"varName":') ||
+              msg.content.text.startsWith('[]')
+            ) {
+              this.setState({ varList: JSON.parse(msg.content.text) });
+            } else {
+              // Get var list
+              kernel.sendInputReply({
+                status: 'ok',
+                value: 'print(var_dic_list())'
+              });
+              outputArea.model.fromJSON([
+                {
+                  name: 'stdout',
+                  output_type: 'stream',
+                  text: msg.content.text
+                }
+              ]);
+              this.getLineNoAndShowDecoration();
+            }
+          }
+        };
+      });
     } else {
       kernel.sendInputReply({ status: 'ok', value: 'c' });
     }
-    this.isWaitingServer = true;
-    delay(() => {
-      kernel.sendInputReply({
-        status: 'ok',
-        value: 'print(var_dic_list())'
-      });
-    }, 50);
-    delay(this.getLineNoAndShowDecoration, 100);
   };
 
   getLineNoAndShowDecoration = () => {
-    let index = 0;
-    const outputArea = window.outputArea;
-    const func = () => {
-      if (outputArea.model.toJSON().length === 0) {
-        if (index < 10) {
-          index += 1;
-          delay(func, 10);
-        } else {
-          this.restartEditor();
+    const text = $('#output-area').text();
+    const lines = text.split('\n');
+    let lineNo = null;
+    lines.forEach((line, index) => {
+      if (line.startsWith('--->') || line.startsWith('---->')) {
+        console.log('line', line);
+        lineNo = line.split('# lineNo:')[1];
+        lineNo = parseInt(lineNo);
+        if (!Number.isInteger(lineNo)) {
+          lineNo = null;
         }
-        return;
+        if (lineNo) {
+          this.showLineDecoration(lineNo);
+        }
       }
-      const output = $('#output-area')
-        .text()
-        .split('\n');
-      let lineNo = null;
-      output.forEach((line, index) => {
-        if (line.startsWith('--->') || line.startsWith('---->')) {
-          console.log('line', line);
-          lineNo = line.split('# lineNo:')[1];
-          lineNo = parseInt(lineNo);
-          if (!Number.isInteger(lineNo)) {
-            lineNo = null;
-          }
-        }
-        if (line.startsWith('> <ipython-input')) {
-          this.setState({ stdOut: output.slice(0, index).join('\n') });
-        }
-        if (line.startsWith('[{"varName":')) {
-          this.setState({ varList: JSON.parse(line) });
-        }
-      });
-      if (lineNo) {
-        this.showLineDecoration(lineNo);
-        defer(() => this.forceUpdate());
-      } else {
-        this.hideLineDecoration();
+      if (line.startsWith('> <ipython-input')) {
+        this.setState({ stdOut: lines.slice(0, index).join('\n') });
       }
-      this.isWaitingServer = false;
-    };
-    func();
+    });
   };
 
   restartEditor = () => {
@@ -339,14 +379,13 @@ class NormalEditor extends React.Component {
       stdOut: null,
       varList: null
     });
+    const outputArea = window.outputArea;
+    outputArea.model.clear();
   };
 
   restartKernel = () => {
     const kernel = window.thebeKernel;
-    const outputArea = window.outputArea;
     kernel.restart().then(thebelab.bootstrap);
-    outputArea.model.clear();
-    this.restartEditor();
   };
 
   showLineDecoration = lineno => {
@@ -376,7 +415,8 @@ class NormalEditor extends React.Component {
     const code = this.code;
     const { stdOut, varList } = this.state;
     const options = {
-      selectOnLineNumbers: true
+      selectOnLineNumbers: true,
+      readOnly: this.startRunLinByLine
     };
     return (
       <div>
