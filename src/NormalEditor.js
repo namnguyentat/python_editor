@@ -99,13 +99,14 @@ class NormalEditor extends React.Component {
     super(props);
     this.code = deafultCode;
     this.codeBlocks = [];
-    this.executedLine = null;
-    this.showExecutedLine = false;
     this.deltaDecorations = [];
     this.startRunLinByLine = false;
     this.isWaitingServer = false;
-    this.stdOut = null;
-    this.varList = null;
+    this.state = {
+      runMode: null,
+      stdOut: null,
+      varList: null
+    };
   }
 
   componentDidMount() {
@@ -235,8 +236,21 @@ class NormalEditor extends React.Component {
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
     const code = this.code;
-    kernel.requestExecute({ code: printVarListCode });
     outputArea.future = kernel.requestExecute({ code: code });
+    outputArea.future.done.then(() => {
+      let future = kernel.requestExecute({ code: printVarListCode });
+      future.onIOPub = msg => {
+        if (
+          msg.content &&
+          msg.content.name &&
+          msg.content.text &&
+          msg.content.name === 'stdout' &&
+          msg.content.text.startsWith('[{"varName":')
+        ) {
+          this.setState({ varList: JSON.parse(msg.content.text) });
+        }
+      };
+    });
   };
 
   finish = () => {
@@ -258,7 +272,7 @@ class NormalEditor extends React.Component {
       this.codeBlocks = this.getCodeBlocks();
       const code = this.codeBlocks.map(b => b.code).join('\n');
       kernel.requestExecute({ code: printVarListCode });
-      outputArea.future = kernel.requestExecute({ code: code });
+      outputArea.future = kernel.requestExecute({ code: code }, false);
     } else {
       kernel.sendInputReply({ status: 'ok', value: 'c' });
     }
@@ -274,7 +288,6 @@ class NormalEditor extends React.Component {
 
   getLineNoAndShowDecoration = () => {
     let index = 0;
-    // const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
     const func = () => {
       if (outputArea.model.toJSON().length === 0) {
@@ -300,10 +313,10 @@ class NormalEditor extends React.Component {
           }
         }
         if (line.startsWith('> <ipython-input')) {
-          this.stdOut = output.slice(0, index).join('\n');
+          this.setState({ stdOut: output.slice(0, index).join('\n') });
         }
         if (line.startsWith('[{"varName":')) {
-          this.varList = JSON.parse(line);
+          this.setState({ varList: JSON.parse(line) });
         }
       });
       if (lineNo) {
@@ -319,21 +332,21 @@ class NormalEditor extends React.Component {
 
   restartEditor = () => {
     this.codeBlocks = [];
-    this.executedLine = null;
-    this.showExecutedLine = false;
     this.startRunLinByLine = false;
     this.isWaitingServer = false;
-    this.stdOut = null;
-    this.varList = null;
     this.hideLineDecoration();
+    this.setState({
+      stdOut: null,
+      varList: null
+    });
   };
 
   restartKernel = () => {
-    this.restartEditor();
     const kernel = window.thebeKernel;
-    if (kernel) {
-      kernel.restart().catch(e => console.error(e));
-    }
+    const outputArea = window.outputArea;
+    kernel.restart().then(thebelab.bootstrap);
+    outputArea.model.clear();
+    this.restartEditor();
   };
 
   showLineDecoration = lineno => {
@@ -361,6 +374,7 @@ class NormalEditor extends React.Component {
 
   render() {
     const code = this.code;
+    const { stdOut, varList } = this.state;
     const options = {
       selectOnLineNumbers: true
     };
@@ -390,18 +404,20 @@ class NormalEditor extends React.Component {
             Restart Kernel
           </button>
         </div>
-        <div>
-          <h3>Output</h3>
-          {this.stdOut && <pre>{this.stdOut}</pre>}
-        </div>
-        <div>
-          <h3>Variable Inspector</h3>
-          {this.varList && (
+        {stdOut && (
+          <div>
+            <h3>Output</h3>
+            <pre>{stdOut}</pre>
+          </div>
+        )}
+        {varList && (
+          <div>
+            <h3>Variable Inspector</h3>
             <table className="table table-sm table-striped">
               <tbody>
-                {this.varList.map(variable => {
+                {varList.map((variable, index) => {
                   return (
-                    <tr>
+                    <tr key={index}>
                       <td>{variable.varName}</td>
                       <td>{variable.varType}</td>
                       <td>{variable.varContent}</td>
@@ -410,8 +426,8 @@ class NormalEditor extends React.Component {
                 })}
               </tbody>
             </table>
-          )}
-        </div>
+          </div>
+        )}
         <div id="output-area" />
       </div>
     );
