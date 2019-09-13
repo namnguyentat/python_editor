@@ -17,6 +17,8 @@ def print_random():
     print_hello()
     return 4
 
+while True:
+  fill_var = random.randomrange(fill_arg, fill_arg)
 
 def print_hello():
     if True:
@@ -78,6 +80,12 @@ class GrayoutEditor extends React.Component {
           options: {
             inlineClassName: 'color-kov-gray'
           }
+        },
+        {
+          range: new this.monaco.Range(18, 1, 18, 100),
+          options: {
+            inlineClassName: 'color-kov-gray'
+          }
         }
       ]
     );
@@ -94,9 +102,8 @@ class GrayoutEditor extends React.Component {
       getDomNode: function() {
         if (!this.domNode) {
           this.domNode = document.createElement('div');
-          this.domNode.innerHTML = 'Conmment for this line';
+          this.domNode.innerHTML = 'Conmment line 10';
           this.domNode.className = 'comment-content-widget';
-          // this.domNode.style.right = '30px';
         }
         return this.domNode;
       },
@@ -113,8 +120,62 @@ class GrayoutEditor extends React.Component {
         };
       }
     };
+    this.otherCommentContentWidget = {
+      domNode: null,
+      getId: function() {
+        return 'other_comment.content.widget';
+      },
+      getDomNode: function() {
+        if (!this.domNode) {
+          this.domNode = document.createElement('div');
+          this.domNode.innerHTML = 'Conmment line 7';
+          this.domNode.className = 'comment-content-widget';
+        }
+        return this.domNode;
+      },
+      getPosition: function() {
+        return {
+          position: {
+            lineNumber: 7,
+            column: 22
+          },
+          preference: [
+            window.monaco.editor.ContentWidgetPositionPreference.EXACT,
+            window.monaco.editor.ContentWidgetPositionPreference.EXACT
+          ]
+        };
+      }
+    };
+    this.other2CommentContentWidget = {
+      domNode: null,
+      getId: function() {
+        return 'other2_comment.content.widget';
+      },
+      getDomNode: function() {
+        if (!this.domNode) {
+          this.domNode = document.createElement('div');
+          this.domNode.innerHTML = 'Conmment line 18';
+          this.domNode.className = 'comment-content-widget';
+        }
+        return this.domNode;
+      },
+      getPosition: function() {
+        return {
+          position: {
+            lineNumber: 18,
+            column: 100
+          },
+          preference: [
+            window.monaco.editor.ContentWidgetPositionPreference.EXACT,
+            window.monaco.editor.ContentWidgetPositionPreference.EXACT
+          ]
+        };
+      }
+    };
 
     this.editor.addContentWidget(this.commentContentWidget);
+    this.editor.addContentWidget(this.otherCommentContentWidget);
+    this.editor.addContentWidget(this.other2CommentContentWidget);
   };
 
   hideLineDecoration = () => {
