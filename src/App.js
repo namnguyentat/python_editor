@@ -1,13 +1,13 @@
 import React from 'react';
 import NormalEditor from './NormalEditor';
-import GrayoutEditor from './GrayoutEditor';
+import LearningCourseEditor from './LearningCourseEditor';
 import './App.css';
 
 class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      mode: 'normal'
+      mode: 'learning'
     };
   }
 
@@ -28,13 +28,13 @@ class App extends React.Component {
           </button>
           <button
             className="btn btn-default"
-            onClick={() => this._switchToMode('grayout')}
+            onClick={() => this._switchToMode('learning')}
           >
-            Grayout
+            Learning Course
           </button>
         </div>
         {mode === 'normal' && <NormalEditor />}
-        {mode === 'grayout' && <GrayoutEditor />}
+        {mode === 'learning' && <LearningCourseEditor />}
       </div>
     );
   }

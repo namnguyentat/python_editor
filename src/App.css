@@ -33,5 +33,6 @@
   padding: 2px 10px;
   border-radius: 2px;
   font-size: 12px;
-  box-shadow: 0 8px 16px 0 rgba(94, 130, 164, 0.3);
+  margin-left: 100px;
+  /* box-shadow: 0 8px 16px 0 rgba(94, 130, 164, 0.3); */
 }
