@@ -268,6 +268,7 @@ class NormalEditor extends React.Component {
     if (!this.startRunLinByLine) {
       this.restartEditor();
       this.startRunLinByLine = true;
+      this.isWaitingServer = true;
       this.codeBlocks = this.getCodeBlocks();
       const code = this.codeBlocks.map(b => b.code).join('\n');
       let printVarFuture = kernel.requestExecute({ code: printVarListCode });
@@ -303,7 +304,6 @@ class NormalEditor extends React.Component {
 
           // Display Data
           if (msg.msg_type === 'display_data') {
-            this.isWaitingServer = false;
             outputArea.model.fromJSON([
               {
                 data: msg.content.data,
@@ -320,6 +320,7 @@ class NormalEditor extends React.Component {
             msg.content.name === 'stdout' &&
             msg.content.text
           ) {
+            this.isWaitingServer = false;
             if (
               msg.content.text.startsWith('[{"varName":') ||
               msg.content.text.startsWith('[]')
@@ -345,6 +346,7 @@ class NormalEditor extends React.Component {
       });
     } else {
       kernel.sendInputReply({ status: 'ok', value: 'c' });
+      this.isWaitingServer = true;
     }
   };
 
