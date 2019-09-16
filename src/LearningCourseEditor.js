@@ -1,6 +1,16 @@
 import React from 'react';
 import MonacoEditor from 'react-monaco-editor';
 import uniq from 'lodash/uniq';
+import { listen } from '@sourcegraph/vscode-ws-jsonrpc';
+import {
+  MonacoLanguageClient,
+  CloseAction,
+  ErrorAction,
+  MonacoServices,
+  createConnection
+} from 'monaco-languageclient';
+import normalizeUrl from 'normalize-url';
+import ReconnectingWebSocket from 'reconnecting-websocket';
 
 const deafultCode = `# Type your code here
 import random
@@ -8,17 +18,20 @@ import random
 a = 1
 b = True
 c = 'String'
-d = [1, 2, 3] #{"ex": true, "cc": true}
+d = [1, 2, 3]#{"ex": true, "cc": true}
 
-def print_random():              #{"ex": true, "bl": {"lines": 6, "text": "print random function, user random"}}
-    print(random.randint(1, 10)) #{"ex": true}
-    print_hello()                #{"ex": true}
-    print(random.randint(1, 10)) #{"ex": true}
-    print_hello()                #{"ex": true}
-    return 4                     #{"ex": true}
+
+def print_random():#{"ex": true, "bl": {"lines": 6, "text": "print random function, user random"}}
+    print(random.randint(1, 10))#{"ex": true}
+    print_hello()#{"ex": true}
+    print(random.randint(1, 10))#{"ex": true}
+    print_hello()#{"ex": true}
+    return 4#{"ex": true}
+
 
 while True:
-  fill_var = random.randomrange(fill_arg, fill_arg)
+    fill_var = random.randomrange('fill_arg', 'fill_arg')
+
 
 def print_hello():
     if True:
@@ -27,12 +40,12 @@ def print_hello():
             print('World')
 
 
-print('hello world') #{"ww": ["hello world"]}
+print('hello world')#{"ww": ["hello world"]}
 print('aaaa')
-# show results #{"ex": true}
-#{"wl": true, "bl": {"lines": 2, "text": "input code to show result"}}
+# show results#{"ex": true}
+#{"wl": true,"bl": {"lines": 2, "text": "input code to show result"}}
 #{"wl": true}
-print_random() #{"ex": true, "cc": true}
+print_random()#{"ex": true, "cc": true}
 `;
 
 class LearningCourseEditor extends React.Component {
@@ -47,6 +60,21 @@ class LearningCourseEditor extends React.Component {
     };
     this.deltaDecorations = [];
     this.contentWidgets = [];
+  }
+
+  componentDidMount() {
+    const url = createUrl('/pyls');
+    const webSocket = createWebSocket(url);
+    // listen when the web socket is opened
+    listen({
+      webSocket,
+      onConnection: connection => {
+        // create and start the language client
+        const languageClient = createLanguageClient(connection);
+        const disposable = languageClient.start();
+        connection.onClose(() => disposable.dispose());
+      }
+    });
   }
 
   parseCode = code => {
@@ -90,6 +118,8 @@ class LearningCourseEditor extends React.Component {
   };
 
   editorDidMount = (editor, monaco) => {
+    window.editor = editor;
+    window.monaco = monaco;
     this.editor = editor;
     this.monaco = monaco;
     this.editor.getModel().updateOptions({ tabSize: 4 });
@@ -99,6 +129,7 @@ class LearningCourseEditor extends React.Component {
       aliases: ['PYTHON', 'python'],
       mimetypes: ['application/json']
     });
+    MonacoServices.install(editor);
     this.showDecorations();
     this.showContentWidgets();
   };
@@ -107,27 +138,41 @@ class LearningCourseEditor extends React.Component {
     const { lineNumber, column } = this.editor.getPosition();
     const index = lineNumber - 1;
     const parsedLine = this.parsedCode[index];
-    // If line is readOnly
-    if (parsedLine.readOnly) {
+
+    if (newValue.split('\n').length < this.parsedCode.length) {
       const code = this.state.code;
       this.setState({
         code: code
       });
-      return;
-    }
-    // If line is grayout
-    if (parsedLine.options.ex) {
-      if (this.characters[index][column - 1] !== ' ') {
+    } else if (parsedLine.options.readOnly) {
+      // If line is readOnly
+      const code = this.state.code;
+      this.setState({
+        code: code
+      });
+    } else if (parsedLine.options.ex) {
+      // If line is grayout
+      if (
+        this.characters[index][column - 1] &&
+        this.characters[index][column - 1] !== ' '
+      ) {
         const insertPositions = parsedLine.options.insertPositions;
         insertPositions.push(
           [lineNumber, column, lineNumber, column + 1].join(',')
         );
         parsedLine.options.insertPositions = uniq(insertPositions);
       }
+      this.setState({
+        code: this.parsedCode.map(line => line.text).join('\n')
+      });
+    } else if (parsedLine.options.wl) {
+      // If line is worm eaten line
+      const currentLine = this.editor.getModel().getLineContent(lineNumber);
+      parsedLine.text = currentLine;
+      this.setState({
+        code: this.parsedCode.map(line => line.text).join('\n')
+      });
     }
-    this.setState({
-      code: this.parsedCode.map(line => line.text).join('\n')
-    });
     this.showDecorations();
     this.showContentWidgets();
   };
@@ -144,39 +189,91 @@ class LearningCourseEditor extends React.Component {
   };
 
   showContentWidgets = () => {
-    this.getAllContentWidgets().forEach(widget => {
+    const widgets = this.getAllContentWidgets();
+    this.contentWidgets.forEach(widget => {
+      this.editor.removeContentWidget(widget);
+    });
+    widgets.forEach(widget => {
       this.editor.addContentWidget(widget);
     });
+    this.contentWidgets = widgets;
   };
 
   getAllContentWidgets = () => {
-    this.correctWidget = {
-      domNode: null,
-      getId: function() {
-        return `correct.content.widget`;
-      },
-      getDomNode: function() {
-        if (!this.domNode) {
-          this.domNode = document.createElement('div');
-          this.domNode.innerHTML = 'Correct';
-          this.domNode.className = 'comment-content-widget';
+    const lines = this.parsedCode;
+    const widgets = [];
+    lines.forEach((line, index) => {
+      // CC line
+      if (line.options.cc) {
+        if (line.options.ex) {
+          if (
+            line.options.grayoutPositions.length ===
+            line.options.insertPositions.length
+          ) {
+            const id = `line_${index}_cc_ex.content.widget`;
+            widgets.push({
+              domNode: null,
+              getId: function() {
+                return id;
+              },
+              getDomNode: function() {
+                if (!this.domNode) {
+                  this.domNode = document.createElement('div');
+                  this.domNode.innerHTML = 'Correct';
+                  this.domNode.className = 'correct-ex-content-widget';
+                }
+                return this.domNode;
+              },
+              getPosition: function() {
+                return {
+                  position: {
+                    lineNumber: index + 1,
+                    column: 1000
+                  },
+                  preference: [
+                    window.monaco.editor.ContentWidgetPositionPreference.EXACT,
+                    window.monaco.editor.ContentWidgetPositionPreference.EXACT
+                  ]
+                };
+              }
+            });
+          }
         }
-        return this.domNode;
-      },
-      getPosition: function() {
-        return {
-          position: {
-            lineNumber: 1,
-            column: 1000
-          },
-          preference: [
-            window.monaco.editor.ContentWidgetPositionPreference.EXACT,
-            window.monaco.editor.ContentWidgetPositionPreference.EXACT
-          ]
-        };
       }
-    };
-    return [];
+      // Balloon line
+      if (line.options.bl) {
+        const id = `line_${index}_bl.content.widget`;
+        widgets.push({
+          domNode: null,
+          getId: function() {
+            return id;
+          },
+          getDomNode: function() {
+            if (!this.domNode) {
+              this.domNode = document.createElement('div');
+              this.domNode.innerHTML = line.options.bl.text;
+              this.domNode.className = 'comment-content-widget';
+              this.domNode.style.height = `${19 * line.options.bl.lines}px`;
+              this.domNode.style.lineHeight = `${19 * line.options.bl.lines}px`;
+            }
+            return this.domNode;
+          },
+          getPosition: function() {
+            return {
+              position: {
+                lineNumber: index + 1,
+                column: 1000
+              },
+              preference: [
+                window.monaco.editor.ContentWidgetPositionPreference.EXACT,
+                window.monaco.editor.ContentWidgetPositionPreference.EXACT
+              ]
+            };
+          }
+        });
+      }
+    });
+    return widgets;
   };
 
   getAllGrayoutPositions = () => {
@@ -195,9 +292,22 @@ class LearningCourseEditor extends React.Component {
     return positions;
   };
 
+  getAllWormLinePositions = () => {
+    const lines = this.parsedCode;
+    let positions = [];
+    lines.forEach((line, index) => {
+      if (!line.options.wl) {
+        return;
+      }
+      positions.push([index + 1, 1, index + 1, 1].join(','));
+    });
+    return positions;
+  };
+
   getAllDeltaDecorations = () => {
-    const positions = this.getAllGrayoutPositions();
-    return positions.map(postion => {
+    // Grayout Decorations
+    const grayoutPositions = this.getAllGrayoutPositions();
+    const grayoutDecorations = grayoutPositions.map(postion => {
       const pos = postion.split(',').map(i => parseInt(i));
       return {
         range: new this.monaco.Range(...pos),
@@ -206,6 +316,19 @@ class LearningCourseEditor extends React.Component {
         }
       };
     });
+    // Worm line Decorations
+    const wormLinePositions = this.getAllWormLinePositions();
+    const wormLineDecorations = wormLinePositions.map(postion => {
+      const pos = postion.split(',').map(i => parseInt(i));
+      return {
+        range: new this.monaco.Range(...pos),
+        options: {
+          isWholeLine: true,
+          className: 'bg-kov-light-green'
+        }
+      };
+    });
+    return [...grayoutDecorations, ...wormLineDecorations];
   };
 
   hideLineDecoration = () => {
@@ -245,3 +368,44 @@ class LearningCourseEditor extends React.Component {
 }
 
 export default LearningCourseEditor;
+
+function createLanguageClient(connection) {
+  return new MonacoLanguageClient({
+    name: 'Sample Language Client',
+    clientOptions: {
+      // use a language id as a document selector
+      documentSelector: ['python'],
+      // disable the default error handler
+      errorHandler: {
+        error: () => ErrorAction.Continue,
+        closed: () => CloseAction.DoNotRestart
+      }
+    },
+    // create a language client connection from the JSON RPC connection on demand
+    connectionProvider: {
+      get: (errorHandler, closeHandler) => {
+        return Promise.resolve(
+          createConnection(connection, errorHandler, closeHandler)
+        );
+      }
+    }
+  });
+}
+
+function createUrl(path) {
+  const host = 'localhost:8080';
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return normalizeUrl(`${protocol}://${host}/${path}`);
+}
+
+function createWebSocket(url) {
+  const socketOptions = {
+    maxReconnectionDelay: 10000,
+    minReconnectionDelay: 1000,
+    reconnectionDelayGrowFactor: 1.3,
+    connectionTimeout: 10000,
+    maxRetries: Infinity,
+    debug: false
+  };
+  return new ReconnectingWebSocket(url, undefined, socketOptions);
+}

@@ -17,6 +17,10 @@
   background-color: orange;
 }
 
+.bg-kov-light-green {
+  background-color: lightgreen;
+}
+
 .color-kov-gray {
   color: gray !important;
 }
@@ -33,6 +37,18 @@
   padding: 2px 10px;
   border-radius: 2px;
   font-size: 12px;
-  margin-left: 100px;
+  margin-left: 200px;
+  /* box-shadow: 0 8px 16px 0 rgba(94, 130, 164, 0.3); */
+}
+
+.correct-ex-content-widget {
+  white-space: nowrap;
+  /* visibility: hidden !important; */
+  background-color: lightskyblue;
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 2px;
+  font-size: 12px;
+  margin-left: 200px;
   /* box-shadow: 0 8px 16px 0 rgba(94, 130, 164, 0.3); */
 }

@@ -12,11 +12,14 @@ class App extends React.Component {
   }
 
   _switchToMode = mode => {
-    this.setState({ mode });
+    window.location.href = `/${mode}`;
   };
 
   render() {
-    const { mode } = this.state;
+    let mode = window.location.pathname;
+    if (mode === '/') {
+      mode = '/learning';
+    }
     return (
       <div>
         <div className="mb-3 mt-3">
@@ -33,8 +36,8 @@ class App extends React.Component {
             Learning Course
           </button>
         </div>
-        {mode === 'normal' && <NormalEditor />}
-        {mode === 'learning' && <LearningCourseEditor />}
+        {mode === '/normal' && <NormalEditor />}
+        {mode === '/learning' && <LearningCourseEditor />}
       </div>
     );
   }
