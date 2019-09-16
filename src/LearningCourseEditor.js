@@ -1,6 +1,7 @@
 import React from 'react';
 import MonacoEditor from 'react-monaco-editor';
 import uniq from 'lodash/uniq';
+import max from 'lodash/max';
 import { listen } from '@sourcegraph/vscode-ws-jsonrpc';
 import {
   MonacoLanguageClient,
@@ -52,14 +53,17 @@ class LearningCourseEditor extends React.Component {
   constructor(props) {
     super(props);
     this.defaultCode = deafultCode;
-    this.characters = this.defaultCode.split('\n').map(line => line.split(''));
+    this.defaultCharacters = this.defaultCode
+      .split('\n')
+      .map(line => line.split(''));
     this.parsedCode = this.parseCode(deafultCode);
-    console.log(this.parsedCode);
+    this.characters = this.parsedCode.map(line => line.text.split(''));
     this.state = {
       code: this.parsedCode.map(line => line.text).join('\n')
     };
     this.deltaDecorations = [];
     this.contentWidgets = [];
+    window.learning = this;
   }
 
   componentDidMount() {
@@ -81,7 +85,6 @@ class LearningCourseEditor extends React.Component {
     return code.split('\n').map((line, index) => {
       const splits = line.split('#');
       const anno = splits[splits.length - 1].trim();
-      console.log(anno);
       if (splits.length > 1 && this.isValidJson(anno)) {
         const options = JSON.parse(anno);
         const text = splits.slice(0, splits.length - 1).join('#');
@@ -89,7 +92,7 @@ class LearningCourseEditor extends React.Component {
           const positions = [];
           const codeLength = text.length;
           for (let i = 1; i <= codeLength; i++) {
-            if (this.characters[index][i - 1] !== ' ') {
+            if (this.defaultCharacters[index][i - 1] !== ' ') {
               positions.push([index + 1, i, index + 1, i + 1].join(','));
             }
           }
@@ -243,6 +246,15 @@ class LearningCourseEditor extends React.Component {
       // Balloon line
       if (line.options.bl) {
         const id = `line_${index}_bl.content.widget`;
+        let maxLineLength = -1;
+        this.parsedCode
+          .slice(index + 1, index + line.options.bl.lines)
+          .forEach((code, codeIndex) => {
+            if (code.text.length > maxLineLength) {
+              maxLineLength = code.text.length;
+            }
+          });
+        const left = max([maxLineLength * 8.5 + 20, 200]);
         widgets.push({
           domNode: null,
           getId: function() {
@@ -255,6 +267,7 @@ class LearningCourseEditor extends React.Component {
               this.domNode.className = 'comment-content-widget';
               this.domNode.style.height = `${19 * line.options.bl.lines}px`;
               this.domNode.style.lineHeight = `${19 * line.options.bl.lines}px`;
+              this.domNode.style.marginLeft = `${parseInt(left)}px`;
             }
             return this.domNode;
           },
@@ -299,7 +312,7 @@ class LearningCourseEditor extends React.Component {
       if (!line.options.wl) {
         return;
       }
-      positions.push([index + 1, 1, index + 1, 1].join(','));
+      positions.push([index + 1, 1, index + 1, 1000].join(','));
     });
     return positions;
   };
@@ -347,7 +360,7 @@ class LearningCourseEditor extends React.Component {
     const options = {
       selectOnLineNumbers: true,
       minimap: {
-        enabled: false
+        enabled: true
       },
       scrollBeyondLastLine: false,
       selectionHighlight: false
