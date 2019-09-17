@@ -139,6 +139,7 @@ class LearningCourseEditor extends React.Component {
 
   onChange = (newValue, e) => {
     const { lineNumber, column } = this.editor.getPosition();
+    const currentLine = this.editor.getModel().getLineContent(lineNumber);
     const index = lineNumber - 1;
     const parsedLine = this.parsedCode[index];
 
@@ -157,7 +158,8 @@ class LearningCourseEditor extends React.Component {
       // If line is grayout
       if (
         this.characters[index][column - 1] &&
-        this.characters[index][column - 1] !== ' '
+        this.characters[index][column - 1] !== ' ' &&
+        this.characters[index][column - 1] === currentLine[column - 1]
       ) {
         const insertPositions = parsedLine.options.insertPositions;
         insertPositions.push(
@@ -170,7 +172,6 @@ class LearningCourseEditor extends React.Component {
       });
     } else if (parsedLine.options.wl) {
       // If line is worm eaten line
-      const currentLine = this.editor.getModel().getLineContent(lineNumber);
       parsedLine.text = currentLine;
       this.setState({
         code: this.parsedCode.map(line => line.text).join('\n')
