@@ -1,8 +1,6 @@
 import React from 'react';
 import MonacoEditor from 'react-monaco-editor';
-import uniq from 'lodash/uniq';
 import max from 'lodash/max';
-import difference from 'lodash/difference';
 import { listen } from '@sourcegraph/vscode-ws-jsonrpc';
 import {
   MonacoLanguageClient,
@@ -31,10 +29,6 @@ def print_random():#{"ex": true, "bl": {"lines": 6, "text": "print random functi
     return 4#{"ex": true}
 
 
-while True:
-    fill_var = random.randomrange('fill_arg', 'fill_arg')
-
-
 def print_hello():
     if True:
         print('Hello')
@@ -42,13 +36,12 @@ def print_hello():
             print('World')
 
 
-print('hello world')#{"ww": ["hello world"]}
+print('hello world')#{"ww": ["hello world"], "cc": true}
 print('aaaa')
-# show results#{"ex": true}
+# show results
 #{"wl": true,"bl": {"lines": 2, "text": "input code to show result"}}
 #{"wl": true}
-print_random()#{"ex": true, "cc": true}
-`;
+print_random()#{"ex": true, "cc": true}`;
 
 class LearningCourseEditor extends React.Component {
   constructor(props) {
@@ -91,41 +84,36 @@ class LearningCourseEditor extends React.Component {
         const options = JSON.parse(anno);
         const text = splits.slice(0, splits.length - 1).join('#');
         if (options.ex) {
-          const positions = [];
-          const codeLength = text.length;
-          for (let i = 1; i <= codeLength; i++) {
-            if (this.defaultCharacters[index][i - 1] !== ' ') {
-              positions.push([index + 1, i, index + 1, i + 1].join(','));
-            }
+          options.grayoutText = text;
+          let spaceCount = text.length - text.trimLeft().length;
+          if (spaceCount === 0) {
+            spaceCount = 1;
           }
-          options.grayoutPositions = positions;
-          options.insertPositions = [];
+          options.spaceCount = spaceCount;
+          return {
+            text: ' '.repeat(spaceCount),
+            options: options
+          };
         }
         if (options.ww) {
-          const grayoutPositions = [];
+          options.grayoutText = text;
+          let spaceCount = text.length - text.trimLeft().length;
+          if (spaceCount === 0) {
+            spaceCount = 1;
+          }
+          options.spaceCount = spaceCount;
           const greenPositions = [];
-          const greenIndex = [];
           options.ww.forEach(word => {
             const start = text.search(word);
             if (start) {
-              for (let i = start + 1; i <= start + word.length; i++) {
-                greenIndex.push(i);
-              }
+              greenPositions.push([start, word.length]);
             }
           });
-          const codeLength = text.length;
-          for (let i = 1; i <= codeLength; i++) {
-            if (greenIndex.includes(i)) {
-              greenPositions.push([index + 1, i, index + 1, i + 1].join(','));
-              continue;
-            }
-            if (this.defaultCharacters[index][i - 1] !== ' ') {
-              grayoutPositions.push([index + 1, i, index + 1, i + 1].join(','));
-            }
-          }
-          options.grayoutPositions = grayoutPositions;
           options.greenPositions = greenPositions;
-          options.insertPositions = [];
+          return {
+            text: ' '.repeat(spaceCount),
+            options: options
+          };
         }
         return {
           text: text,
@@ -166,66 +154,30 @@ class LearningCourseEditor extends React.Component {
   };
 
   onChange = (newValue, e) => {
-    const { lineNumber, column } = this.editor.getPosition();
+    const { lineNumber } = this.editor.getPosition();
     const currentLine = this.editor.getModel().getLineContent(lineNumber);
     const index = lineNumber - 1;
     const parsedLine = this.parsedCode[index];
 
-    if (newValue.split('\n').length < this.parsedCode.length) {
-      const code = this.state.code;
-      this.setState({
-        code: code
-      });
-    } else if (parsedLine.options.readOnly) {
-      // If line is readOnly
-      const code = this.state.code;
-      this.setState({
-        code: code
-      });
-    } else if (parsedLine.options.ex) {
-      // If line is grayout
-      if (this.characters[index][column - 1]) {
-        const insertPositions = parsedLine.options.insertPositions;
-        insertPositions.push(
-          [lineNumber, column, lineNumber, column + 1].join(',')
-        );
-        parsedLine.options.insertPositions = uniq(insertPositions);
-      }
-      const text = parsedLine.text;
-      if (text.length > currentLine.length || column > text.length) {
-        parsedLine.text = currentLine;
-      } else {
-        parsedLine.text =
-          text.substr(0, column - 1) +
-          currentLine[column - 1] +
-          text.substr(column);
-      }
+    if (
+      newValue.split('\n').length < this.parsedCode.length ||
+      parsedLine.options.readOnly
+    ) {
       this.setState({
         code: this.parsedCode.map(line => line.text).join('\n')
       });
-    } else if (parsedLine.options.ww) {
-      // If line is grayout
-      if (this.characters[index][column - 1]) {
-        const insertPositions = parsedLine.options.insertPositions;
-        insertPositions.push(
-          [lineNumber, column, lineNumber, column + 1].join(',')
-        );
-        parsedLine.options.insertPositions = uniq(insertPositions);
-      }
-      const text = parsedLine.text;
-      if (text.length > currentLine.length || column > text.length) {
-        parsedLine.text = currentLine;
+    } else if (parsedLine.options.ex || parsedLine.options.ww) {
+      // grayout or ww line
+      if (currentLine.length === 0) {
+        parsedLine.text = ' '.repeat(parsedLine.options.spaceCount);
       } else {
-        parsedLine.text =
-          text.substr(0, column - 1) +
-          currentLine[column - 1] +
-          text.substr(column);
+        parsedLine.text = currentLine;
       }
       this.setState({
         code: this.parsedCode.map(line => line.text).join('\n')
       });
     } else if (parsedLine.options.wl) {
-      // If line is worm eaten line
+      // wl line
       parsedLine.text = currentLine;
       this.setState({
         code: this.parsedCode.map(line => line.text).join('\n')
@@ -263,44 +215,116 @@ class LearningCourseEditor extends React.Component {
     lines.forEach((line, index) => {
       // CC line
       if (line.options.cc) {
-        if (line.options.ex) {
-          if (
-            difference(
-              line.options.grayoutPositions,
-              line.options.insertPositions
-            ).length === 0 &&
-            this.defaultParsedCode[index].text ===
-              this.editor.getModel().getLineContent(index + 1)
-          ) {
-            const id = `line_${index}_cc_ex.content.widget`;
-            widgets.push({
-              domNode: null,
-              getId: function() {
-                return id;
-              },
-              getDomNode: function() {
-                if (!this.domNode) {
-                  this.domNode = document.createElement('div');
-                  this.domNode.innerHTML = 'Correct';
-                  this.domNode.className = 'correct-ex-content-widget';
-                }
-                return this.domNode;
-              },
-              getPosition: function() {
-                return {
-                  position: {
-                    lineNumber: index + 1,
-                    column: 1000
-                  },
-                  preference: [
-                    window.monaco.editor.ContentWidgetPositionPreference.EXACT,
-                    window.monaco.editor.ContentWidgetPositionPreference.EXACT
-                  ]
-                };
+        if (
+          this.defaultParsedCode[index].options.grayoutText.trimEnd() ===
+          this.editor
+            .getModel()
+            .getLineContent(index + 1)
+            .trimEnd()
+        ) {
+          const id = `line_${index}_cc_ex.content.widget`;
+          widgets.push({
+            domNode: null,
+            getId: function() {
+              return id;
+            },
+            getDomNode: function() {
+              if (!this.domNode) {
+                this.domNode = document.createElement('div');
+                this.domNode.innerHTML = 'Correct';
+                this.domNode.className = 'correct-ex-content-widget';
               }
-            });
-          }
+              return this.domNode;
+            },
+            getPosition: function() {
+              return {
+                position: {
+                  lineNumber: index + 1,
+                  column: 1000
+                },
+                preference: [
+                  window.monaco.editor.ContentWidgetPositionPreference.EXACT,
+                  window.monaco.editor.ContentWidgetPositionPreference.EXACT
+                ]
+              };
+            }
+          });
         }
+      }
+      // Grayout line
+      if (line.options.ex) {
+        const id = `line_${index}_ex.content.widget`;
+        widgets.push({
+          domNode: null,
+          getId: function() {
+            return id;
+          },
+          getDomNode: function() {
+            if (!this.domNode) {
+              this.domNode = document.createElement('div');
+              this.domNode.innerHTML = line.options.grayoutText.replace(
+                /\s/g,
+                '&nbsp;'
+              );
+              this.domNode.className = 'ex-content-widget';
+              this.domNode.style.zIndex = -1;
+            }
+            return this.domNode;
+          },
+          getPosition: function() {
+            return {
+              position: {
+                lineNumber: index + 1,
+                column: 0
+              },
+              preference: [
+                window.monaco.editor.ContentWidgetPositionPreference.EXACT,
+                window.monaco.editor.ContentWidgetPositionPreference.EXACT
+              ]
+            };
+          }
+        });
+      }
+      // Grayout line
+      if (line.options.ww) {
+        const id = `line_${index}_ww.content.widget`;
+        widgets.push({
+          domNode: null,
+          getId: function() {
+            return id;
+          },
+          getDomNode: function() {
+            if (!this.domNode) {
+              this.domNode = document.createElement('div');
+              let text = line.options.grayoutText;
+              const spaceCount = text.length - text.trimLeft().length;
+              text = text.trimLeft();
+              line.options.ww.forEach(
+                word =>
+                  (text = text.replace(
+                    word,
+                    `<span class='bg-kov-light-green'>${word}</span>`
+                  ))
+              );
+              this.domNode.innerHTML = '&nbsp;'.repeat(spaceCount) + text;
+              this.domNode.className = 'ww-content-widget';
+              this.domNode.style.zIndex = -1;
+            }
+            return this.domNode;
+          },
+          getPosition: function() {
+            return {
+              position: {
+                lineNumber: index + 1,
+                column: 0
+              },
+              preference: [
+                window.monaco.editor.ContentWidgetPositionPreference.EXACT,
+                window.monaco.editor.ContentWidgetPositionPreference.EXACT
+              ]
+            };
+          }
+        });
       }
       // Balloon line
       if (line.options.bl) {
@@ -313,7 +337,7 @@ class LearningCourseEditor extends React.Component {
               maxLineLength = code.text.length;
             }
           });
-        const left = max([maxLineLength * 8.5 + 20, 200]);
+        const left = max([maxLineLength * 8.5 + 20, 300]);
         widgets.push({
           domNode: null,
           getId: function() {
@@ -334,7 +358,7 @@ class LearningCourseEditor extends React.Component {
             return {
               position: {
                 lineNumber: index + 1,
-                column: 1000
+                column: 1
               },
               preference: [
                 window.monaco.editor.ContentWidgetPositionPreference.EXACT,
@@ -346,36 +370,6 @@ class LearningCourseEditor extends React.Component {
       }
     });
     return widgets;
-  };
-
-  getAllGrayoutPositions = () => {
-    const lines = this.parsedCode;
-    let positions = [];
-    lines.forEach((line, index) => {
-      if (line.options.ex || line.options.ww) {
-        const grayoutPositions = line.options.grayoutPositions;
-        const insertPositions = line.options.insertPositions;
-        positions = positions.concat(
-          grayoutPositions.filter(pos => !insertPositions.includes(pos))
-        );
-      }
-    });
-    return positions;
-  };
-
-  getAllGreenPositions = () => {
-    const lines = this.parsedCode;
-    let positions = [];
-    lines.forEach((line, index) => {
-      if (line.options.ww) {
-        const greenPositions = line.options.greenPositions;
-        const insertPositions = line.options.insertPositions;
-        positions = positions.concat(
-          greenPositions.filter(pos => !insertPositions.includes(pos))
-        );
-      }
-    });
-    return positions;
   };
 
   getAllWormLinePositions = () => {
@@ -391,29 +385,6 @@ class LearningCourseEditor extends React.Component {
   };
 
   getAllDeltaDecorations = () => {
-    // Grayout Decorations
-    const grayoutPositions = this.getAllGrayoutPositions();
-    const grayoutDecorations = grayoutPositions.map(postion => {
-      const pos = postion.split(',').map(i => parseInt(i));
-      return {
-        range: new this.monaco.Range(...pos),
-        options: {
-          inlineClassName: 'color-kov-gray'
-        }
-      };
-    });
-    // Grayout Decorations
-    const greenPositions = this.getAllGreenPositions();
-    const greenDecorations = greenPositions.map(postion => {
-      const pos = postion.split(',').map(i => parseInt(i));
-      return {
-        range: new this.monaco.Range(...pos),
-        options: {
-          isWholeLine: false,
-          className: 'bg-kov-light-green'
-        }
-      };
-    });
     // Worm line Decorations
     const wormLinePositions = this.getAllWormLinePositions();
     const wormLineDecorations = wormLinePositions.map(postion => {
@@ -426,7 +397,7 @@ class LearningCourseEditor extends React.Component {
         }
       };
     });
-    return [...grayoutDecorations, ...greenDecorations, ...wormLineDecorations];
+    return [...wormLineDecorations];
   };
 
   hideLineDecoration = () => {

@@ -1,0 +1,7 @@
+[pycodestyle]
+# W291  trailing whitespace
+# W292  no newline at end of file
+# W293	blank line contains whitespace
+# W391	blank line at end of file
+# E303	too many blank lines (3)
+ignore = W291,W292,W293,W391,E303
