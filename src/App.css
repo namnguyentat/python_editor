@@ -41,6 +41,21 @@
   /* box-shadow: 0 8px 16px 0 rgba(94, 130, 164, 0.3); */
 }
 
+.grayout-content-widget {
+  white-space: nowrap;
+  /* visibility: hidden !important; */
+  background-color: #5e82a4;
+  padding: 2px 10px;
+  border-radius: 2px;
+  margin-left: 0px;
+  font-family: 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
+  font-weight: normal;
+  font-size: 14px;
+  line-height: 19px;
+  letter-spacing: 0px;
+  color: gray;
+}
+
 .correct-ex-content-widget {
   white-space: nowrap;
   /* visibility: hidden !important; */

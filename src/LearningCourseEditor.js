@@ -2,6 +2,7 @@ import React from 'react';
 import MonacoEditor from 'react-monaco-editor';
 import uniq from 'lodash/uniq';
 import max from 'lodash/max';
+import difference from 'lodash/difference';
 import { listen } from '@sourcegraph/vscode-ws-jsonrpc';
 import {
   MonacoLanguageClient,
@@ -56,6 +57,7 @@ class LearningCourseEditor extends React.Component {
     this.defaultCharacters = this.defaultCode
       .split('\n')
       .map(line => line.split(''));
+    this.defaultParsedCode = this.parseCode(deafultCode);
     this.parsedCode = this.parseCode(deafultCode);
     this.characters = this.parsedCode.map(line => line.text.split(''));
     this.state = {
@@ -99,8 +101,34 @@ class LearningCourseEditor extends React.Component {
           options.grayoutPositions = positions;
           options.insertPositions = [];
         }
+        if (options.ww) {
+          const grayoutPositions = [];
+          const greenPositions = [];
+          const greenIndex = [];
+          options.ww.forEach(word => {
+            const start = text.search(word);
+            if (start) {
+              for (let i = start + 1; i <= start + word.length; i++) {
+                greenIndex.push(i);
+              }
+            }
+          });
+          const codeLength = text.length;
+          for (let i = 1; i <= codeLength; i++) {
+            if (greenIndex.includes(i)) {
+              greenPositions.push([index + 1, i, index + 1, i + 1].join(','));
+              continue;
+            }
+            if (this.defaultCharacters[index][i - 1] !== ' ') {
+              grayoutPositions.push([index + 1, i, index + 1, i + 1].join(','));
+            }
+          }
+          options.grayoutPositions = grayoutPositions;
+          options.greenPositions = greenPositions;
+          options.insertPositions = [];
+        }
         return {
-          text: splits.slice(0, splits.length - 1).join('#'),
+          text: text,
           options: options
         };
       } else {
@@ -156,16 +184,42 @@ class LearningCourseEditor extends React.Component {
       });
     } else if (parsedLine.options.ex) {
       // If line is grayout
-      if (
-        this.characters[index][column - 1] &&
-        this.characters[index][column - 1] !== ' ' &&
-        this.characters[index][column - 1] === currentLine[column - 1]
-      ) {
+      if (this.characters[index][column - 1]) {
         const insertPositions = parsedLine.options.insertPositions;
         insertPositions.push(
           [lineNumber, column, lineNumber, column + 1].join(',')
         );
         parsedLine.options.insertPositions = uniq(insertPositions);
+      }
+      const text = parsedLine.text;
+      if (text.length > currentLine.length || column > text.length) {
+        parsedLine.text = currentLine;
+      } else {
+        parsedLine.text =
+          text.substr(0, column - 1) +
+          currentLine[column - 1] +
+          text.substr(column);
+      }
+      this.setState({
+        code: this.parsedCode.map(line => line.text).join('\n')
+      });
+    } else if (parsedLine.options.ww) {
+      // If line is grayout
+      if (this.characters[index][column - 1]) {
+        const insertPositions = parsedLine.options.insertPositions;
+        insertPositions.push(
+          [lineNumber, column, lineNumber, column + 1].join(',')
+        );
+        parsedLine.options.insertPositions = uniq(insertPositions);
+      }
+      const text = parsedLine.text;
+      if (text.length > currentLine.length || column > text.length) {
+        parsedLine.text = currentLine;
+      } else {
+        parsedLine.text =
+          text.substr(0, column - 1) +
+          currentLine[column - 1] +
+          text.substr(column);
       }
       this.setState({
         code: this.parsedCode.map(line => line.text).join('\n')
@@ -211,8 +265,12 @@ class LearningCourseEditor extends React.Component {
       if (line.options.cc) {
         if (line.options.ex) {
           if (
-            line.options.grayoutPositions.length ===
-            line.options.insertPositions.length
+            difference(
+              line.options.grayoutPositions,
+              line.options.insertPositions
+            ).length === 0 &&
+            this.defaultParsedCode[index].text ===
+              this.editor.getModel().getLineContent(index + 1)
           ) {
             const id = `line_${index}_cc_ex.content.widget`;
             widgets.push({
@@ -294,14 +352,28 @@ class LearningCourseEditor extends React.Component {
     const lines = this.parsedCode;
     let positions = [];
     lines.forEach((line, index) => {
-      if (!line.options.ex) {
-        return;
+      if (line.options.ex || line.options.ww) {
+        const grayoutPositions = line.options.grayoutPositions;
+        const insertPositions = line.options.insertPositions;
+        positions = positions.concat(
+          grayoutPositions.filter(pos => !insertPositions.includes(pos))
+        );
       }
-      const grayoutPositions = line.options.grayoutPositions;
-      const insertPositions = line.options.insertPositions;
-      positions = positions.concat(
-        grayoutPositions.filter(pos => !insertPositions.includes(pos))
-      );
+    });
+    return positions;
+  };
+
+  getAllGreenPositions = () => {
+    const lines = this.parsedCode;
+    let positions = [];
+    lines.forEach((line, index) => {
+      if (line.options.ww) {
+        const greenPositions = line.options.greenPositions;
+        const insertPositions = line.options.insertPositions;
+        positions = positions.concat(
+          greenPositions.filter(pos => !insertPositions.includes(pos))
+        );
+      }
     });
     return positions;
   };
@@ -330,6 +402,18 @@ class LearningCourseEditor extends React.Component {
         }
       };
     });
+    // Grayout Decorations
+    const greenPositions = this.getAllGreenPositions();
+    const greenDecorations = greenPositions.map(postion => {
+      const pos = postion.split(',').map(i => parseInt(i));
+      return {
+        range: new this.monaco.Range(...pos),
+        options: {
+          isWholeLine: false,
+          className: 'bg-kov-light-green'
+        }
+      };
+    });
     // Worm line Decorations
     const wormLinePositions = this.getAllWormLinePositions();
     const wormLineDecorations = wormLinePositions.map(postion => {
@@ -342,7 +426,7 @@ class LearningCourseEditor extends React.Component {
         }
       };
     });
-    return [...grayoutDecorations, ...wormLineDecorations];
+    return [...grayoutDecorations, ...greenDecorations, ...wormLineDecorations];
   };
 
   hideLineDecoration = () => {
