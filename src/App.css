@@ -18,11 +18,11 @@
 }
 
 .bg-kov-light-green {
-  background-color: lightgreen;
+  background-color: #eeffee;
 }
 
 .color-kov-gray {
-  color: gray !important;
+  color: #c0c0c0 !important;
 }
 
 .jp-Stdin-prompt {
@@ -31,9 +31,9 @@
 
 .comment-content-widget {
   white-space: nowrap;
-  background-color: #5e82a4;
+  background-color: lightskyblue;
   color: #fff;
-  padding: 2px 10px;
+  padding: 0px 10px;
   border-radius: 2px;
   font-size: 12px;
   margin-left: 200px;
@@ -42,7 +42,7 @@
 .grayout-content-widget {
   white-space: nowrap;
   background-color: #5e82a4;
-  padding: 2px 10px;
+  padding: 0px 10px;
   border-radius: 2px;
   margin-left: 0px;
   font-family: 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
@@ -57,7 +57,7 @@
   white-space: nowrap;
   background-color: lightskyblue;
   color: #fff;
-  padding: 2px 10px;
+  padding: 0px 10px;
   border-radius: 2px;
   font-size: 12px;
   margin-left: 200px;
