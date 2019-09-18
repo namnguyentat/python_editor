@@ -213,6 +213,13 @@ class LearningCourseEditor extends React.Component {
     this.showDecorations();
     this.showContentWidgets();
     thebelab.bootstrap();
+    setTimeout(() => {
+      const kernel = window.thebeKernel;
+      if (kernel && !kernel.isReady) {
+        this.restartKernel();
+        window.location.reload();
+      }
+    }, 5000);
   };
 
   onChange = (newValue, e) => {
