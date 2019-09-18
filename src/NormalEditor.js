@@ -13,6 +13,7 @@ import ReconnectingWebSocket from 'reconnecting-websocket';
 import * as thebelab from './thebelab';
 import $ from 'jquery';
 
+const commentRegex = /(:)(\s*)(#[^*]*)/g;
 const printVarListCode = `import json
 from sys import getsizeof
 
@@ -144,7 +145,10 @@ class NormalEditor extends React.Component {
 
   getCodeBlocks = () => {
     const code = this.code;
-    const lines = code.split('\n');
+    const lines = code
+      .split('\n')
+      .map(line => line.trimEnd())
+      .map(line => line.replace(commentRegex, ':'));
     let buffer = [];
     let codeBlocks = [];
     codeBlocks.push({
