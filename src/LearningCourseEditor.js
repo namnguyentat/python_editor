@@ -485,10 +485,8 @@ class LearningCourseEditor extends React.Component {
   };
 
   hideLineDecoration = () => {
-    this.deltaDecorations = this.editor.deltaDecorations(
-      this.deltaDecorations,
-      []
-    );
+    this.executingLineNumber = null;
+    this.showDecorations();
   };
 
   getCodeBlocks = () => {
@@ -629,9 +627,9 @@ class LearningCourseEditor extends React.Component {
             msg.msg_type === 'status' &&
             msg.content.execution_state === 'idle'
           ) {
-            this.hideLineDecoration();
             this.startRunLinByLine = false;
             this.isWaitingServer = false;
+            this.showDecorations();
             this.forceUpdate();
             return;
           }
@@ -702,6 +700,10 @@ class LearningCourseEditor extends React.Component {
 
   getLineNoAndShowDecoration = () => {
     const text = $('#output-area').text();
+    if (!text.includes('> <ipython-input')) {
+      this.setState({ stdOut: text });
+      return;
+    }
     const lines = text.split('\n');
     let lineNo = null;
     lines.forEach((line, index) => {
