@@ -14,7 +14,7 @@ import ReconnectingWebSocket from 'reconnecting-websocket';
 import * as thebelab from './thebelab';
 import $ from 'jquery';
 import TextFileUtil from './utils/text_file_utility';
-
+const commentRegex = /(:)(\s*)(#[^*]*)/g;
 const printVarListCode = `import json
 from sys import getsizeof
 
@@ -400,7 +400,7 @@ class LearningCourseEditor extends React.Component {
         const id = `line_${index}_bl.content.widget`;
         let maxLineLength = -1;
         this.parsedCode
-          .slice(index + 1, index + line.options.bl.lines)
+          .slice(index, index + line.options.bl.lines)
           .forEach((code, codeIndex) => {
             if (code.text.length > maxLineLength) {
               maxLineLength = code.text.length;
@@ -491,7 +491,10 @@ class LearningCourseEditor extends React.Component {
 
   getCodeBlocks = () => {
     const code = this.state.code;
-    const lines = code.split('\n');
+    const lines = code
+      .split('\n')
+      .map(line => line.trimEnd())
+      .map(line => line.replace(commentRegex, ':'));
     let buffer = [];
     let codeBlocks = [];
     codeBlocks.push({
@@ -661,6 +664,23 @@ class LearningCourseEditor extends React.Component {
               }
             ]);
             return;
+          }
+
+          // Error
+          if (
+            msg.msg_type === 'error' &&
+            msg.content.ename &&
+            msg.content.evalue
+          ) {
+            this.isWaitingServer = false;
+            this.setState({ stdOut: msg.content.evalue });
+            outputArea.model.fromJSON([
+              {
+                name: 'stdout',
+                output_type: 'stream',
+                text: msg.content.traceback
+              }
+            ]);
           }
 
           // Stream
