@@ -576,26 +576,27 @@ class LearningCourseEditor extends React.Component {
   };
 
   runCode = () => {
-    this.restartEditor();
-    $('#output-area').show();
-    const kernel = window.thebeKernel;
-    const outputArea = window.outputArea;
-    const code = this.state.code;
-    outputArea.future = kernel.requestExecute({ code: code });
-    outputArea.future.done.then(() => {
-      let future = kernel.requestExecute({ code: printVarListCode });
-      future.onIOPub = msg => {
-        if (
-          msg.content &&
-          msg.content.name &&
-          msg.content.text &&
-          msg.content.name === 'stdout' &&
-          msg.content.text.startsWith('[{"varName":')
-        ) {
-          this.setState({ varList: JSON.parse(msg.content.text) });
-        }
-      };
-    });
+    this.runCodeLineByLine(true);
+    // this.restartEditor();
+    // $('#output-area').show();
+    // const kernel = window.thebeKernel;
+    // const outputArea = window.outputArea;
+    // const code = this.state.code;
+    // outputArea.future = kernel.requestExecute({ code: code });
+    // outputArea.future.done.then(() => {
+    //   let future = kernel.requestExecute({ code: printVarListCode });
+    //   future.onIOPub = msg => {
+    //     if (
+    //       msg.content &&
+    //       msg.content.name &&
+    //       msg.content.text &&
+    //       msg.content.name === 'stdout' &&
+    //       msg.content.text.startsWith('[{"varName":')
+    //     ) {
+    //       this.setState({ varList: JSON.parse(msg.content.text) });
+    //     }
+    //   };
+    // });
   };
 
   finish = () => {
@@ -604,7 +605,7 @@ class LearningCourseEditor extends React.Component {
     this.restartEditor();
   };
 
-  runCodeLineByLine = () => {
+  runCodeLineByLine = (autoRun = false) => {
     if (this.isWaitingServer) {
       return;
     }
@@ -674,6 +675,10 @@ class LearningCourseEditor extends React.Component {
               msg.content.text.startsWith('[]')
             ) {
               this.setState({ varList: JSON.parse(msg.content.text) });
+              if (autoRun) {
+                kernel.sendInputReply({ status: 'ok', value: 'c' });
+                this.isWaitingServer = true;
+              }
             } else {
               // Get var list
               kernel.sendInputReply({
@@ -823,7 +828,10 @@ class LearningCourseEditor extends React.Component {
           <button className="btn btn-primary" onClick={this.runCode}>
             Run
           </button>
-          <button className="btn btn-success" onClick={this.runCodeLineByLine}>
+          <button
+            className="btn btn-success"
+            onClick={() => this.runCodeLineByLine(false)}
+          >
             Run line
           </button>
           <button className="btn btn-success" onClick={this.finish}>
