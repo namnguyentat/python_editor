@@ -13,6 +13,7 @@ import normalizeUrl from 'normalize-url';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import * as thebelab from './thebelab';
 import $ from 'jquery';
+import TextFileUtil from './utils/text_file_utility';
 
 const printVarListCode = `import json
 from sys import getsizeof
@@ -64,7 +65,7 @@ def var_dic_list():
 print(var_dic_list())
 `;
 
-const deafultCode = `# Type your code here
+const defaultCode = `# Type your code here
 import random
 
 a = 1
@@ -98,12 +99,12 @@ print_random()#{"ex": true, "cc": true}`;
 class LearningCourseEditor extends React.Component {
   constructor(props) {
     super(props);
-    this.defaultCode = deafultCode;
+    this.defaultCode = defaultCode;
     this.defaultCharacters = this.defaultCode
       .split('\n')
       .map(line => line.split(''));
-    this.defaultParsedCode = this.parseCode(deafultCode);
-    this.parsedCode = this.parseCode(deafultCode);
+    this.defaultParsedCode = this.parseCode(defaultCode);
+    this.parsedCode = this.parseCode(defaultCode);
     this.characters = this.parsedCode.map(line => line.text.split(''));
     this.state = {
       code: this.parsedCode.map(line => line.text).join('\n'),
@@ -624,7 +625,7 @@ class LearningCourseEditor extends React.Component {
             this.hideLineDecoration();
             this.startRunLinByLine = false;
             this.isWaitingServer = false;
-            this.forceUpdate()
+            this.forceUpdate();
             return;
           }
 
@@ -733,6 +734,54 @@ class LearningCourseEditor extends React.Component {
     kernel.restart().then(thebelab.bootstrap);
   };
 
+  reloadCode = () => {
+    this.parsedCode = this.parseCode(this.defaultCode);
+    this.characters = this.parsedCode.map(line => line.text.split(''));
+    this.setState(
+      {
+        code: this.parsedCode.map(line => line.text).join('\n'),
+        runMode: null,
+        stdOut: null,
+        varList: null
+      },
+      () => {
+        this.restartEditor();
+        this.showDecorations();
+        this.showContentWidgets();
+      }
+    );
+  };
+
+  onImportFileChanged = e => {
+    e.preventDefault();
+    this.importCodeFile(document.getElementById('file_import').files[0]);
+  };
+
+  importCodeFile = f => {
+    const import_promise = () => {
+      return new Promise((resolve, reject) => {
+        TextFileUtil.import(f, (e, d) => {
+          if (e) {
+            reject(e);
+          }
+          resolve(d);
+        });
+      });
+    };
+
+    import_promise()
+      .then(text => {
+        this.defaultCode = text;
+        this.defaultCharacters = this.defaultCode
+          .split('\n')
+          .map(line => line.split(''));
+        this.reloadCode();
+      })
+      .catch(e => {
+        console.error('validation error ->', e);
+      });
+  };
+
   calculateHeight = () => {
     return this.defaultCode.split('\n').length * 19;
   };
@@ -770,6 +819,21 @@ class LearningCourseEditor extends React.Component {
           </button>
           <button className="btn btn-success" onClick={this.finish}>
             Finish
+          </button>
+          <button className="btn btn-success">
+            <label>
+              Import
+              <input
+                id="file_import"
+                className="hidden"
+                type="file"
+                accept={'.txt,.py'}
+                onChange={this.onImportFileChanged}
+              />
+            </label>
+          </button>
+          <button className="btn btn-success" onClick={this.reloadCode}>
+            Reload
           </button>
           <button className="btn btn-danger" onClick={this.restartKernel}>
             Restart Kernel

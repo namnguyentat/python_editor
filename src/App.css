@@ -1,3 +1,7 @@
+.hidden {
+  display: none;
+}
+
 .thebelab-input {
   display: none;
 }
@@ -99,4 +103,8 @@
   user-select: none;
   white-space: nowrap;
   left: 0;
+}
+
+.btn > label {
+  margin-bottom: 0px !important;
 }
