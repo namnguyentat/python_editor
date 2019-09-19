@@ -107,8 +107,8 @@ class LearningCourseEditor extends React.Component {
     this.executingLineNumber = null;
     this.deltaDecorations = [];
     this.contentWidgets = [];
+    this.currentCode = this.parsedCode.map(line => line.text).join('\n');
     this.state = {
-      code: this.parsedCode.map(line => line.text).join('\n'),
       stdOut: null,
       varList: null
     };
@@ -216,18 +216,27 @@ class LearningCourseEditor extends React.Component {
   };
 
   onChange = (newValue, e) => {
+    if (this.currentCode === newValue) {
+      return;
+    }
     const lines = newValue.split('\n');
     const diff = this.defaultLineNumber - lines.length;
     for (let i = 0; i < diff; i++) {
       lines.push('');
     }
-    this.setState({ code: lines.join('\n') }, () => {
-      setTimeout(() => {
-        this.showDecorations();
-        this.showContentWidgets();
-      }, 10);
-    });
-    return;
+    this.currentCode = lines.join('\n');
+    const range = new this.monaco.Range(1, 1, lines.length, 1000);
+    const id = { major: 1, minor: 1 };
+    const text = lines.join('\n');
+    const op = {
+      identifier: id,
+      range: range,
+      text: text,
+      forceMoveMarkers: true
+    };
+    this.editor.executeEdits('my sourc code', [op]);
+    this.showDecorations();
+    this.showContentWidgets();
   };
 
   showDecorations = () => {
@@ -460,7 +469,7 @@ class LearningCourseEditor extends React.Component {
   };
 
   getCode = () => {
-    const code = this.state.code;
+    const code = this.currentCode;
     const lines = code
       .split('\n')
       .map(line => line.trimEnd())
@@ -553,7 +562,7 @@ class LearningCourseEditor extends React.Component {
     // $('#output-area').show();
     // const kernel = window.thebeKernel;
     // const outputArea = window.outputArea;
-    // const code = this.state.code;
+    // const code = this.current_code;
     // outputArea.future = kernel.requestExecute({ code: code });
     // outputArea.future.done.then(() => {
     //   let future = kernel.requestExecute({ code: printVarListCode });
@@ -747,9 +756,9 @@ class LearningCourseEditor extends React.Component {
 
   reloadCode = () => {
     this.parsedCode = this.parseCode(this.defaultCode);
+    this.currentCode = this.parsedCode.map(line => line.text).join('\n');
     this.setState(
       {
-        code: this.parsedCode.map(line => line.text).join('\n'),
         stdOut: null,
         varList: null
       },
@@ -793,7 +802,7 @@ class LearningCourseEditor extends React.Component {
   };
 
   render() {
-    const code = this.state.code;
+    const code = this.currentCode;
     const { stdOut, varList } = this.state;
     const options = {
       readOnly: this.startRunLinByLine,
