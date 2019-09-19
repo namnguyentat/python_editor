@@ -2,4 +2,4 @@
 
 set -e
 
-docker-compose -p pythoneditor stop
+docker-compose -f docker/docker-compose.yml -p pythoneditor stop
