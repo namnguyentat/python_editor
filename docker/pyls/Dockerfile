@@ -11,9 +11,7 @@ ENV APP_HOME /app
 RUN mkdir -p $APP_HOME
 WORKDIR $APP_HOME
 
-ENV CONFIG_DIR ~/.config/
-RUN mkdir -p $APP_HOME
-COPY pyls/config/pycodestyle CONFIG_DIR
+COPY pyls/config/pycodestyle /root/.config/
 
 
 EXPOSE 8080
