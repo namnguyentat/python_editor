@@ -1,0 +1,42 @@
+version: '3.6'
+
+services:
+  react:
+    build:
+      context: ..
+      dockerfile: ./docker/react/Dockerfile
+    container_name: python-editor-react
+    depends_on:
+      - pyls
+      - jupyter
+    volumes:
+      - ..:/app
+    ports:
+      - 3000:3000
+    command: ["yarn", "start"]
+    tty: true
+    stdin_open: true
+
+  pyls:
+    build:
+      context: ..
+      dockerfile: ./docker/pyls/Dockerfile
+    container_name: python-editor-pyls
+    volumes:
+      - ../pyls:/app
+    ports:
+      - 8080:8080
+    command: ["yarn", "start"]
+    privileged: true
+
+  jupyter:
+    build:
+      context: ..
+      dockerfile: ./docker/jupyter/Dockerfile
+    container_name: python-editor-jupyter
+    volumes:
+      - ..:/app
+    ports:
+      - 8888:8888
+    command: ["jupyter", "notebook", "--allow-root", "--NotebookApp.token=test-secret", "--NotebookApp.allow_origin='*'", "--NotebookApp.ip='0.0.0.0'"]
+    privileged: true
