@@ -100,25 +100,18 @@ class LearningCourseEditor extends React.Component {
   constructor(props) {
     super(props);
     this.defaultCode = defaultCode;
-    this.defaultCharacters = this.defaultCode
-      .split('\n')
-      .map(line => line.split(''));
-    this.defaultParsedCode = this.parseCode(defaultCode);
-    this.parsedCode = this.parseCode(defaultCode);
-    this.characters = this.parsedCode.map(line => line.text.split(''));
-    this.state = {
-      code: this.parsedCode.map(line => line.text).join('\n'),
-      runMode: null,
-      stdOut: null,
-      varList: null
-    };
-
-    this.codeBlocks = [];
+    this.defaultLineNumber = this.defaultCode.split('\n').length;
+    this.parsedCode = this.parseCode(this.defaultCode);
     this.startRunLinByLine = false;
     this.isWaitingServer = false;
     this.executingLineNumber = null;
     this.deltaDecorations = [];
     this.contentWidgets = [];
+    this.state = {
+      code: this.parsedCode.map(line => line.text).join('\n'),
+      stdOut: null,
+      varList: null
+    };
     window.learning = this;
   }
 
@@ -152,7 +145,7 @@ class LearningCourseEditor extends React.Component {
           }
           options.spaceCount = spaceCount;
           return {
-            text: ' '.repeat(spaceCount),
+            text: '',
             options: options
           };
         }
@@ -172,7 +165,7 @@ class LearningCourseEditor extends React.Component {
           });
           options.greenPositions = greenPositions;
           return {
-            text: ' '.repeat(spaceCount),
+            text: '',
             options: options
           };
         }
@@ -183,7 +176,7 @@ class LearningCourseEditor extends React.Component {
       } else {
         return {
           text: line,
-          options: { readOnly: true }
+          options: {}
         };
       }
     });
@@ -223,41 +216,18 @@ class LearningCourseEditor extends React.Component {
   };
 
   onChange = (newValue, e) => {
-    const { lineNumber } = this.editor.getPosition();
-    const currentLine = this.editor.getModel().getLineContent(lineNumber);
-    const index = lineNumber - 1;
-    const parsedLine = this.parsedCode[index];
-
-    if (
-      newValue.split('\n').length < this.parsedCode.length ||
-      parsedLine.options.readOnly
-    ) {
-      this.setState({
-        code: this.parsedCode.map(line => line.text).join('\n')
-      });
-    } else if (parsedLine.options.ex || parsedLine.options.ww) {
-      // grayout or ww line
-      if (currentLine.length === 0) {
-        parsedLine.text = ' '.repeat(parsedLine.options.spaceCount);
-      } else {
-        parsedLine.text = currentLine;
-      }
-      this.setState({
-        code: this.parsedCode.map(line => line.text).join('\n')
-      });
-    } else if (parsedLine.options.wl) {
-      // wl line
-      parsedLine.text = currentLine;
-      this.setState({
-        code: this.parsedCode.map(line => line.text).join('\n')
-      });
+    const lines = newValue.split('\n');
+    const diff = this.defaultLineNumber - lines.length;
+    for (let i = 0; i < diff; i++) {
+      lines.push('');
     }
-    this.showDecorations();
-    this.showContentWidgets();
-  };
-
-  isFinish = () => {
-    return this.grayoutPositions.length <= this.insertPositions.length;
+    this.setState({ code: lines.join('\n') }, () => {
+      setTimeout(() => {
+        this.showDecorations();
+        this.showContentWidgets();
+      }, 10);
+    });
+    return;
   };
 
   showDecorations = () => {
@@ -285,7 +255,7 @@ class LearningCourseEditor extends React.Component {
       // CC line
       if (line.options.cc) {
         if (
-          this.defaultParsedCode[index].options.grayoutText.trimEnd() ===
+          this.parsedCode[index].options.grayoutText.trimEnd() ===
           this.editor
             .getModel()
             .getLineContent(index + 1)
@@ -489,7 +459,7 @@ class LearningCourseEditor extends React.Component {
     this.showDecorations();
   };
 
-  getCodeBlocks = () => {
+  getCode = () => {
     const code = this.state.code;
     const lines = code
       .split('\n')
@@ -574,8 +544,7 @@ class LearningCourseEditor extends React.Component {
         });
       }
     });
-    console.log(codeBlocks.map(b => b.code).join('\n'));
-    return codeBlocks;
+    return codeBlocks.map(b => b.code).join('\n');
   };
 
   runCode = () => {
@@ -616,15 +585,14 @@ class LearningCourseEditor extends React.Component {
     const kernel = window.thebeKernel;
     const outputArea = window.outputArea;
     outputArea.model.clear();
+    this.isWaitingServer = true;
     if (!this.startRunLinByLine) {
       this.restartEditor();
       this.startRunLinByLine = true;
-      this.isWaitingServer = true;
-      this.codeBlocks = this.getCodeBlocks();
-      const code = this.codeBlocks.map(b => b.code).join('\n');
-      let printVarFuture = kernel.requestExecute({ code: printVarListCode });
+      const code = this.getCode();
+      const printVarFuture = kernel.requestExecute({ code: printVarListCode });
       printVarFuture.done.then(() => {
-        let future = kernel.requestExecute({ code: code });
+        const future = kernel.requestExecute({ code: code });
         future.onIOPub = msg => {
           // IDLE status
           if (
@@ -638,11 +606,34 @@ class LearningCourseEditor extends React.Component {
             return;
           }
 
+          // Error
+          if (
+            msg.msg_type === 'error' &&
+            msg.content.ename &&
+            msg.content.evalue
+          ) {
+            this.startRunLinByLine = false;
+            this.isWaitingServer = false;
+            this.showDecorations();
+            this.setState({
+              stdOut: msg.content.evalue
+            });
+            outputArea.model.fromJSON([
+              {
+                name: 'stdout',
+                output_type: 'stream',
+                text: msg.content.traceback
+              }
+            ]);
+          }
+
           // Execute Result
           if (msg.msg_type === 'execute_result') {
             this.isWaitingServer = false;
             if (msg.content.data && msg.content.data['text/plain']) {
-              this.setState({ stdOut: msg.content.data['text/plain'] });
+              this.setState({
+                stdOut: msg.content.data['text/plain']
+              });
             }
             outputArea.model.fromJSON([
               {
@@ -666,23 +657,6 @@ class LearningCourseEditor extends React.Component {
             return;
           }
 
-          // Error
-          if (
-            msg.msg_type === 'error' &&
-            msg.content.ename &&
-            msg.content.evalue
-          ) {
-            this.isWaitingServer = false;
-            this.setState({ stdOut: msg.content.evalue });
-            outputArea.model.fromJSON([
-              {
-                name: 'stdout',
-                output_type: 'stream',
-                text: msg.content.traceback
-              }
-            ]);
-          }
-
           // Stream
           if (
             msg.msg_type === 'stream' &&
@@ -694,9 +668,14 @@ class LearningCourseEditor extends React.Component {
               msg.content.text.startsWith('[{"varName":') ||
               msg.content.text.startsWith('[]')
             ) {
-              this.setState({ varList: JSON.parse(msg.content.text) });
+              this.setState({
+                varList: JSON.parse(msg.content.text)
+              });
               if (autoRun) {
-                kernel.sendInputReply({ status: 'ok', value: 'c' });
+                kernel.sendInputReply({
+                  status: 'ok',
+                  value: 'c'
+                });
                 this.isWaitingServer = true;
               }
             } else {
@@ -719,7 +698,6 @@ class LearningCourseEditor extends React.Component {
       });
     } else {
       kernel.sendInputReply({ status: 'ok', value: 'c' });
-      this.isWaitingServer = true;
     }
   };
 
@@ -751,7 +729,6 @@ class LearningCourseEditor extends React.Component {
   };
 
   restartEditor = () => {
-    this.codeBlocks = [];
     this.startRunLinByLine = false;
     this.isWaitingServer = false;
     this.hideLineDecoration();
@@ -770,11 +747,9 @@ class LearningCourseEditor extends React.Component {
 
   reloadCode = () => {
     this.parsedCode = this.parseCode(this.defaultCode);
-    this.characters = this.parsedCode.map(line => line.text.split(''));
     this.setState(
       {
         code: this.parsedCode.map(line => line.text).join('\n'),
-        runMode: null,
         stdOut: null,
         varList: null
       },
@@ -806,9 +781,6 @@ class LearningCourseEditor extends React.Component {
     import_promise()
       .then(text => {
         this.defaultCode = text;
-        this.defaultCharacters = this.defaultCode
-          .split('\n')
-          .map(line => line.split(''));
         this.reloadCode();
       })
       .catch(e => {
