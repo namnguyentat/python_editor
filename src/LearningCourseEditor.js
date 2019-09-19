@@ -217,6 +217,8 @@ class LearningCourseEditor extends React.Component {
 
   onChange = (newValue, e) => {
     if (this.currentCode === newValue) {
+      this.showDecorations();
+      this.showContentWidgets();
       return;
     }
     const lines = newValue.split('\n');
@@ -225,16 +227,18 @@ class LearningCourseEditor extends React.Component {
       lines.push('');
     }
     this.currentCode = lines.join('\n');
-    const range = new this.monaco.Range(1, 1, lines.length, 1000);
-    const id = { major: 1, minor: 1 };
-    const text = lines.join('\n');
-    const op = {
-      identifier: id,
-      range: range,
-      text: text,
-      forceMoveMarkers: true
-    };
-    this.editor.executeEdits('my sourc code', [op]);
+    if (diff > 0) {
+      const range = new this.monaco.Range(1, 1, lines.length, 1000);
+      const id = { major: 1, minor: 1 };
+      const text = lines.join('\n');
+      const op = {
+        identifier: id,
+        range: range,
+        text: text,
+        forceMoveMarkers: true
+      };
+      this.editor.executeEdits('my source code', [op]);
+    }
     this.showDecorations();
     this.showContentWidgets();
   };
