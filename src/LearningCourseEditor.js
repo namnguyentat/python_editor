@@ -263,6 +263,7 @@ class LearningCourseEditor extends React.Component {
 
   getAllContentWidgets = () => {
     const lines = this.parsedCode;
+    const editorLines = this.editor.getModel().getLinesContent();
     const widgets = [];
     lines.forEach((line, index) => {
       // CC line
@@ -382,14 +383,26 @@ class LearningCourseEditor extends React.Component {
       if (line.options.bl) {
         const id = `line_${index}_bl.content.widget`;
         let maxLineLength = -1;
+        // grayout text
         this.parsedCode
           .slice(index, index + line.options.bl.lines)
           .forEach((code, codeIndex) => {
-            if (code.text.length > maxLineLength) {
-              maxLineLength = code.text.length;
+            if (
+              code.options.grayoutText &&
+              code.options.grayoutText.length > maxLineLength
+            ) {
+              maxLineLength = code.options.grayoutText.length;
             }
           });
-        const left = max([maxLineLength * 8.5 + 20, 300]);
+        // current editor text
+        editorLines
+          .slice(index, index + line.options.bl.lines)
+          .forEach((code, codeIndex) => {
+            if (code.length > maxLineLength) {
+              maxLineLength = code.length;
+            }
+          });
+        const left = parseInt(max([maxLineLength * 9.5, 200]));
         widgets.push({
           domNode: null,
           getId: function() {
