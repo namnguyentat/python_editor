@@ -14,6 +14,7 @@ import ReconnectingWebSocket from 'reconnecting-websocket';
 import * as thebelab from './thebelab';
 import $ from 'jquery';
 import TextFileUtil from './utils/text_file_utility';
+
 const commentRegex = /(:)(\s*)(#[^*]*)/g;
 const printVarListCode = `import json
 from sys import getsizeof
@@ -768,6 +769,7 @@ class LearningCourseEditor extends React.Component {
 
   restartKernel = () => {
     const kernel = window.thebeKernel;
+    this.restartEditor();
     kernel.restart().then(thebelab.bootstrap);
   };
 

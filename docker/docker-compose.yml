@@ -13,7 +13,7 @@ services:
       - ..:/app
     ports:
       - 3000:3000
-    command: ["yarn", "start"]
+    command: ['yarn', 'start']
     tty: true
     stdin_open: true
 
@@ -26,7 +26,7 @@ services:
       - ../pyls:/app
     ports:
       - 8080:8080
-    command: ["yarn", "start"]
+    command: ['yarn', 'start']
     privileged: true
 
   jupyter:
@@ -35,8 +35,16 @@ services:
       dockerfile: ./docker/jupyter/Dockerfile
     container_name: python-editor-jupyter
     volumes:
-      - ..:/app
+      - ../notebooks:/app
     ports:
       - 8888:8888
-    command: ["jupyter", "notebook", "--allow-root", "--NotebookApp.token=test-secret", "--NotebookApp.allow_origin='*'", "--NotebookApp.ip='0.0.0.0'"]
+    command:
+      [
+        'jupyter',
+        'notebook',
+        '--allow-root',
+        '--NotebookApp.token=test-secret',
+        "--NotebookApp.allow_origin='*'",
+        "--NotebookApp.ip='0.0.0.0'",
+      ]
     privileged: true

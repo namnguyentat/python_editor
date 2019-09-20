@@ -288,14 +288,38 @@ class NormalEditor extends React.Component {
             this.hideLineDecoration();
             this.startRunLinByLine = false;
             this.isWaitingServer = false;
+            this.forceUpdate();
             return;
+          }
+
+          // Error
+          if (
+            msg.msg_type === 'error' &&
+            msg.content.ename &&
+            msg.content.evalue
+          ) {
+            this.startRunLinByLine = false;
+            this.isWaitingServer = false;
+            this.hideLineDecoration();
+            this.setState({
+              stdOut: msg.content.evalue
+            });
+            outputArea.model.fromJSON([
+              {
+                name: 'stdout',
+                output_type: 'stream',
+                text: msg.content.traceback
+              }
+            ]);
           }
 
           // Execute Result
           if (msg.msg_type === 'execute_result') {
             this.isWaitingServer = false;
             if (msg.content.data && msg.content.data['text/plain']) {
-              this.setState({ stdOut: msg.content.data['text/plain'] });
+              this.setState({
+                stdOut: msg.content.data['text/plain']
+              });
             }
             outputArea.model.fromJSON([
               {
@@ -330,9 +354,14 @@ class NormalEditor extends React.Component {
               msg.content.text.startsWith('[{"varName":') ||
               msg.content.text.startsWith('[]')
             ) {
-              this.setState({ varList: JSON.parse(msg.content.text) });
+              this.setState({
+                varList: JSON.parse(msg.content.text)
+              });
               if (autoRun) {
-                kernel.sendInputReply({ status: 'ok', value: 'c' });
+                kernel.sendInputReply({
+                  status: 'ok',
+                  value: 'c'
+                });
                 this.isWaitingServer = true;
               }
             } else {
@@ -361,6 +390,10 @@ class NormalEditor extends React.Component {
 
   getLineNoAndShowDecoration = () => {
     const text = $('#output-area').text();
+    if (!text.includes('> <ipython-input')) {
+      this.setState({ stdOut: text });
+      return;
+    }
     const lines = text.split('\n');
     let lineNo = null;
     lines.forEach((line, index) => {
@@ -396,6 +429,7 @@ class NormalEditor extends React.Component {
 
   restartKernel = () => {
     const kernel = window.thebeKernel;
+    this.restartEditor();
     kernel.restart().then(thebelab.bootstrap);
   };
 
