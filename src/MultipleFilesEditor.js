@@ -14,7 +14,11 @@ import * as thebelab from './thebelab';
 import $ from 'jquery';
 
 const commentRegex = /(:)(\s*)(#[^*]*)/g;
-const printVarListCode = `import json
+const printVarListCode = `
+%reload_ext autoreload
+%autoreload 2
+%reset -f
+import json
 from sys import getsizeof
 
 from IPython import get_ipython
@@ -121,6 +125,7 @@ class NormalEditor extends React.Component {
       aliases: ['PYTHON', 'python'],
       mimetypes: ['application/json']
     });
+    this.editorMounted = true;
     MonacoServices.install(editor);
     thebelab.bootstrap();
   };
@@ -493,7 +498,7 @@ class NormalEditor extends React.Component {
           })}
         </div>
         {editors.map(editor => {
-          if (!this.editor && editor.name !== 'main.py') {
+          if (!this.editorMounted && editor.name !== 'main.py') {
             return null;
           }
           const style = {};

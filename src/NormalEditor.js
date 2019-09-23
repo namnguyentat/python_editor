@@ -14,7 +14,11 @@ import * as thebelab from './thebelab';
 import $ from 'jquery';
 
 const commentRegex = /(:)(\s*)(#[^*]*)/g;
-const printVarListCode = `import json
+const printVarListCode = `
+%reload_ext autoreload
+%autoreload 2
+%reset -f
+import json
 from sys import getsizeof
 
 from IPython import get_ipython

@@ -23,3 +23,5 @@ yarn-debug.log*
 yarn-error.log*
 __pycache__
 notebooks/*.py
+notebooks/*.ipynb
+notebooks/.ipynb_checkpoints
