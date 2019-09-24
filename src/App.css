@@ -4,6 +4,19 @@
     url("./SourceHanMono-Normal.woff") format("woff");
 }
 
+body {
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
+}
+
+div, span {
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
+}
+
+/* .view-overlays *,
+.view-overlays.focused {
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
+} */
+
 .hidden {
   display: none;
 }
@@ -58,8 +71,8 @@
   margin-left: 0px;
   font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
   font-weight: normal;
-  font-size: 14px;
-  line-height: 19px;
+  font-size: 12px;
+  line-height: 18px;
   letter-spacing: 0px;
   color: gray;
 }
@@ -75,6 +88,7 @@
 }
 
 .ex-content-widget {
+  /* opacity: 0; */
   margin-left: 0px;
   box-sizing: border-box;
   color: gray;
@@ -82,10 +96,10 @@
   display: inline;
   font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
   font-feature-settings: 'liga'0, 'calt'0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: normal;
-  line-height: 19px;
+  line-height: 18px;
   text-align: left;
   text-size-adjust: 100%;
   user-select: none;
@@ -101,10 +115,10 @@
   display: inline;
   font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
   font-feature-settings: 'liga'0, 'calt'0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 400;
-  letter-spacing: normal;
-  line-height: 19px;
+  letter-spacing: 0;
+  line-height: 18px;
   text-align: left;
   text-size-adjust: 100%;
   user-select: none;

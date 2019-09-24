@@ -834,7 +834,9 @@ class LearningCourseEditor extends React.Component {
         enabled: true
       },
       scrollBeyondLastLine: false,
-      selectionHighlight: false
+      selectionHighlight: false,
+      fontSize: 12,
+      fontFamily: 'Source Han Mono'
     };
     return (
       <div>
