@@ -14,6 +14,7 @@ import ReconnectingWebSocket from 'reconnecting-websocket';
 import * as thebelab from './thebelab';
 import $ from 'jquery';
 import TextFileUtil from './utils/text_file_utility';
+import platform from './utils/platform';
 
 const commentRegex = /(:)(\s*)(#[^*]*)/g;
 const printVarListCode = `
@@ -79,7 +80,7 @@ c = 'String'
 d = [1, 2, 3]#{"ex": true, "cc": true}
 
 
-def print_random():#{"ex": true, "bl": {"lines": 6, "text": "print random function, user random"}}
+def print_random():#{"ex": true, "bl": {"lines": 6, "text": ["print random function", "user random"]}}
     print(random.randint(1, 10))#{"ex": true}
     print_hello()#{"ex": true}
     print(random.randint(1, 10))#{"ex": true}
@@ -97,7 +98,7 @@ def print_hello():
 print('hello world')#{"ww": ["hello world"], "cc": true}
 print('aaaa')
 # show results
-#{"wl": true,"bl": {"lines": 2, "text": "input code to show result"}}
+#{"wl": true,"bl": {"lines": 2, "text": ["input code to show result"]}}
 #{"wl": true}
 print_random()#{"ex": true, "cc": true}`;
 
@@ -115,7 +116,8 @@ class LearningCourseEditor extends React.Component {
     this.currentCode = this.parsedCode.map(line => line.text).join('\n');
     this.state = {
       stdOut: null,
-      varList: null
+      varList: null,
+      fontSize: 14
     };
     window.learning = this;
   }
@@ -273,6 +275,10 @@ class LearningCourseEditor extends React.Component {
     const lines = this.parsedCode;
     const editorLines = this.editor.getModel().getLinesContent();
     const widgets = [];
+    const fontSize = this.state.fontSize;
+    const lineHeight = this.calculateLineHeight();
+    const fontSizePx = `${this.state.fontSize}px`;
+    const lineHeightPx = `${this.calculateLineHeight()}px`;
     lines.forEach((line, index) => {
       // CC line
       if (line.options.cc) {
@@ -294,6 +300,8 @@ class LearningCourseEditor extends React.Component {
                 this.domNode = document.createElement('div');
                 this.domNode.innerHTML = 'Correct';
                 this.domNode.className = 'correct-ex-content-widget';
+                this.domNode.style.fontSize = fontSizePx;
+                this.domNode.style.lineHeight = lineHeightPx;
               }
               return this.domNode;
             },
@@ -329,6 +337,8 @@ class LearningCourseEditor extends React.Component {
               );
               this.domNode.className = 'ex-content-widget';
               this.domNode.style.zIndex = -1;
+              this.domNode.style.fontSize = fontSizePx;
+              this.domNode.style.lineHeight = lineHeightPx;
             }
             return this.domNode;
           },
@@ -370,6 +380,8 @@ class LearningCourseEditor extends React.Component {
               this.domNode.innerHTML = '&nbsp;'.repeat(spaceCount) + text;
               this.domNode.className = 'ww-content-widget';
               this.domNode.style.zIndex = -1;
+              this.domNode.style.fontSize = fontSizePx;
+              this.domNode.style.lineHeight = lineHeightPx;
             }
             return this.domNode;
           },
@@ -419,11 +431,13 @@ class LearningCourseEditor extends React.Component {
           getDomNode: function() {
             if (!this.domNode) {
               this.domNode = document.createElement('div');
-              this.domNode.innerHTML = line.options.bl.text;
+              this.domNode.innerHTML = line.options.bl.text.join('<br>');
               this.domNode.className = 'comment-content-widget';
-              this.domNode.style.height = `${19 * line.options.bl.lines}px`;
-              this.domNode.style.lineHeight = `${19 * line.options.bl.lines}px`;
+              this.domNode.style.height = `${lineHeight *
+                line.options.bl.lines}px`;
               this.domNode.style.marginLeft = `${parseInt(left)}px`;
+              this.domNode.style.fontSize = fontSizePx;
+              this.domNode.style.lineHeight = lineHeightPx;
             }
             return this.domNode;
           },
@@ -827,9 +841,15 @@ class LearningCourseEditor extends React.Component {
     return this.defaultCode.split('\n').length * 19;
   };
 
+  calculateLineHeight = () => {
+    const GOLDEN_LINE_HEIGHT_RATIO = platform.isMacintosh ? 1.5 : 1.35;
+    const { fontSize } = this.state;
+    return Math.round(GOLDEN_LINE_HEIGHT_RATIO * fontSize);
+  };
+
   render() {
     const code = this.currentCode;
-    const { stdOut, varList } = this.state;
+    const { stdOut, varList, fontSize } = this.state;
     const options = {
       readOnly: this.startRunLinByLine,
       selectOnLineNumbers: true,
@@ -838,7 +858,8 @@ class LearningCourseEditor extends React.Component {
       },
       scrollBeyondLastLine: false,
       selectionHighlight: false,
-      fontSize: 12,
+      fontSize: fontSize,
+      lineHeight: this.calculateLineHeight(),
       fontFamily: 'Source Han Mono'
     };
     return (

@@ -3,7 +3,7 @@ import NormalEditor from './NormalEditor';
 import LearningCourseEditor from './LearningCourseEditor';
 import MultipleFilesEditor from './MultipleFilesEditor';
 import './App.css';
-import { osType } from './utils/platform_utility';
+import { OS } from './utils/platform';
 
 class App extends React.Component {
   constructor(props) {
@@ -23,7 +23,7 @@ class App extends React.Component {
       mode = '/multiple';
     }
     return (
-      <div className={`${osType()}`}>
+      <div className={OS}>
         <div className="mb-3 mt-3">
           <button
             className="btn btn-success"

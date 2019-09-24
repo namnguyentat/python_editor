@@ -66,7 +66,6 @@ span {
   color: #fff;
   padding: 0px 10px;
   border-radius: 2px;
-  font-size: 12px;
   margin-left: 200px;
 }
 
@@ -76,7 +75,6 @@ span {
   color: #fff;
   padding: 0px 10px;
   border-radius: 2px;
-  font-size: 12px;
   margin-left: 200px;
 }
 
@@ -90,24 +88,13 @@ span {
   font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace,
     'Droid Sans Fallback';
   font-feature-settings: 'liga' 0, 'calt' 0;
-  font-size: 12px;
   font-weight: 400;
   letter-spacing: normal;
-  /* line-height: 18px; */
   text-align: left;
   text-size-adjust: 100%;
   user-select: none;
   white-space: nowrap;
   left: 0;
-}
-.linux .ex-content-widget {
-  line-height: 16px !important;
-}
-.win .ex-content-widget {
-  line-height: 16px !important;
-}
-.mac .ex-content-widget {
-  line-height: 18px !important;
 }
 
 .ww-content-widget {
@@ -119,24 +106,13 @@ span {
   font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace,
     'Droid Sans Fallback';
   font-feature-settings: 'liga' 0, 'calt' 0;
-  font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
-  /* line-height: 18px; */
   text-align: left;
   text-size-adjust: 100%;
   user-select: none;
   white-space: nowrap;
   left: 0;
-}
-.linux .ww-content-widget {
-  line-height: 16px !important;
-}
-.win .ww-content-widget {
-  line-height: 16px !important;
-}
-.mac .ww-content-widget {
-  line-height: 18px !important;
 }
 
 .monaco-editor .view-lines div span,
