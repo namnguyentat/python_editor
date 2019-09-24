@@ -1,15 +1,18 @@
 @font-face {
-  font-family: "Source Han Mono";
-  src: url("./SourceHanMono-Normal.woff2") format("woff2"),
-    url("./SourceHanMono-Normal.woff") format("woff");
+  font-family: 'Source Han Mono';
+  src: url('./SourceHanMono-Normal.woff2') format('woff2'),
+    url('./SourceHanMono-Normal.woff') format('woff');
 }
 
 body {
-  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace,
+    'Droid Sans Fallback';
 }
 
-div, span {
-  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
+div,
+span {
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace,
+    'Droid Sans Fallback';
 }
 
 /* .view-overlays *,
@@ -35,6 +38,10 @@ div, span {
 
 .btn {
   margin-right: 10px;
+}
+
+.btn > label {
+  margin-bottom: 0px !important;
 }
 
 .bg-kov-orange {
@@ -63,20 +70,6 @@ div, span {
   margin-left: 200px;
 }
 
-.grayout-content-widget {
-  white-space: nowrap;
-  background-color: #5e82a4;
-  padding: 0px 10px;
-  border-radius: 2px;
-  margin-left: 0px;
-  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
-  font-weight: normal;
-  font-size: 12px;
-  line-height: 18px;
-  letter-spacing: 0px;
-  color: gray;
-}
-
 .correct-ex-content-widget {
   white-space: nowrap;
   background-color: lightskyblue;
@@ -94,17 +87,27 @@ div, span {
   color: gray;
   cursor: text;
   display: inline;
-  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
-  font-feature-settings: 'liga'0, 'calt'0;
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace,
+    'Droid Sans Fallback';
+  font-feature-settings: 'liga' 0, 'calt' 0;
   font-size: 12px;
   font-weight: 400;
   letter-spacing: normal;
-  line-height: 18px;
+  /* line-height: 18px; */
   text-align: left;
   text-size-adjust: 100%;
   user-select: none;
   white-space: nowrap;
   left: 0;
+}
+.linux .ex-content-widget {
+  line-height: 16px !important;
+}
+.win .ex-content-widget {
+  line-height: 16px !important;
+}
+.mac .ex-content-widget {
+  line-height: 18px !important;
 }
 
 .ww-content-widget {
@@ -113,24 +116,31 @@ div, span {
   color: gray;
   cursor: text;
   display: inline;
-  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback';
-  font-feature-settings: 'liga'0, 'calt'0;
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace,
+    'Droid Sans Fallback';
+  font-feature-settings: 'liga' 0, 'calt' 0;
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 18px;
+  /* line-height: 18px; */
   text-align: left;
   text-size-adjust: 100%;
   user-select: none;
   white-space: nowrap;
   left: 0;
 }
-
-.btn>label {
-  margin-bottom: 0px !important;
+.linux .ww-content-widget {
+  line-height: 16px !important;
+}
+.win .ww-content-widget {
+  line-height: 16px !important;
+}
+.mac .ww-content-widget {
+  line-height: 18px !important;
 }
 
 .monaco-editor .view-lines div span,
 .monaco-editor.line-numbers {
-  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace, 'Droid Sans Fallback' !important;
+  font-family: 'Source Han Mono', 'Droid Sans Mono', monospace, monospace,
+    'Droid Sans Fallback' !important;
 }

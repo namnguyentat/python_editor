@@ -128,6 +128,9 @@ class NormalEditor extends React.Component {
     this.editorMounted = true;
     MonacoServices.install(editor);
     thebelab.bootstrap();
+    setTimeout(() => {
+      monaco.editor.remeasureFonts();
+    }, 3000);
   };
 
   onChange = (name, newValue) => {

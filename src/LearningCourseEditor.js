@@ -212,6 +212,9 @@ class LearningCourseEditor extends React.Component {
     this.showContentWidgets();
     thebelab.bootstrap();
     setTimeout(() => {
+      monaco.editor.remeasureFonts();
+    }, 3000);
+    setTimeout(() => {
       const kernel = window.thebeKernel;
       if (kernel && !kernel.isReady) {
         this.restartKernel();
