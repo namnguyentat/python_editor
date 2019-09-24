@@ -19,7 +19,7 @@ class App extends React.Component {
   render() {
     let mode = window.location.pathname;
     if (mode === '/') {
-      mode = '/multiples';
+      mode = '/multiple';
     }
     return (
       <div>

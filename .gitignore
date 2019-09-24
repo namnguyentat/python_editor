@@ -25,3 +25,4 @@ __pycache__
 notebooks/*.py
 notebooks/*.ipynb
 notebooks/.ipynb_checkpoints
+pyls/node_modules/.yarn-integrity
