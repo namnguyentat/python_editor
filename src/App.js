@@ -1,13 +1,14 @@
 import React from 'react';
 import NormalEditor from './NormalEditor';
 import LearningCourseEditor from './LearningCourseEditor';
+import MultipleFilesEditor from './MultipleFilesEditor';
 import './App.css';
 
 class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      mode: 'learning'
+      mode: 'multiple'
     };
   }
 
@@ -18,11 +19,17 @@ class App extends React.Component {
   render() {
     let mode = window.location.pathname;
     if (mode === '/') {
-      mode = '/learning';
+      mode = '/multiples';
     }
     return (
       <div>
         <div className="mb-3 mt-3">
+          <button
+            className="btn btn-success"
+            onClick={() => this._switchToMode('multiple')}
+          >
+            Multiple files
+          </button>
           <button
             className="btn btn-primary"
             onClick={() => this._switchToMode('normal')}
@@ -38,6 +45,7 @@ class App extends React.Component {
         </div>
         {mode === '/normal' && <NormalEditor />}
         {mode === '/learning' && <LearningCourseEditor />}
+        {mode === '/multiple' && <MultipleFilesEditor />}
       </div>
     );
   }

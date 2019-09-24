@@ -4,7 +4,7 @@ import 'codemirror/lib/codemirror.css';
 
 import { Widget } from '@phosphor/widgets';
 import { Session } from '@jupyterlab/services';
-import { ServerConnection } from '@jupyterlab/services';
+import { ServerConnection, ContentsManager } from '@jupyterlab/services';
 import { MathJaxTypesetter } from '@jupyterlab/mathjax2';
 import { OutputArea, OutputAreaModel } from '@jupyterlab/outputarea';
 import {
@@ -62,8 +62,8 @@ const _defaultOptions = {
     name: 'python3',
     path: '/',
     serverSettings: {
-      baseUrl: 'http://127.0.0.1:8888',
-      wsUrl: 'ws://127.0.0.1:8888',
+      baseUrl: 'http://localhost:8888',
+      wsUrl: 'ws://localhost:8888',
       token: 'test-secret'
     }
   }
@@ -168,6 +168,8 @@ function requestKernel(kernelOptions) {
     message: 'Starting Kernel'
   });
   let p = Session.startNew(kernelOptions);
+  let contents = new ContentsManager(kernelOptions);
+  window.contents = contents;
   p.then(session => {
     events.trigger('status', {
       status: 'ready',

@@ -69,38 +69,19 @@ print(var_dic_list())
 `;
 
 const defaultCode = `# Type your code here
-import random
+import module_1
 
-a = 1
-b = True
-c = 'String'
-d = [1, 2, 3]
+module_1.print_hello_world()
+`;
 
-
-def print_random():
-    print(random.randint(1, 10))
-    print_hello()
-    print(random.randint(1, 10))
-    print_hello()
-    return 4
-
-
-def print_hello():
-    if True:
-        print('Hello')
-        if True:
-            print('World')
-
-
-print('hello world')
-print('aaaa')
-print_random()
+const module1Code = `# Type your code here
+def print_hello_world():
+    print("hello world")
 `;
 
 class NormalEditor extends React.Component {
   constructor(props) {
     super(props);
-    this.code = defaultCode;
     this.codeBlocks = [];
     this.deltaDecorations = [];
     this.startRunLinByLine = false;
@@ -108,7 +89,12 @@ class NormalEditor extends React.Component {
     this.state = {
       runMode: null,
       stdOut: null,
-      varList: null
+      varList: null,
+      editors: [
+        { name: 'main.py', code: defaultCode },
+        { name: 'module_1.py', code: module1Code }
+      ],
+      activeEditor: 'main.py'
     };
   }
 
@@ -139,16 +125,31 @@ class NormalEditor extends React.Component {
       aliases: ['PYTHON', 'python'],
       mimetypes: ['application/json']
     });
+    this.editorMounted = true;
     MonacoServices.install(editor);
     thebelab.bootstrap();
   };
 
-  onChange = (newValue, e) => {
-    this.code = newValue;
+  onChange = (name, newValue) => {
+    const editors = this.state.editors.map(editor => {
+      if (editor.name === name) {
+        editor.code = newValue;
+      }
+      return editor;
+    });
+    this.setState({ editors: editors });
+  };
+
+  mainEditor = () => {
+    return this.state.editors.find(editor => editor.name === 'main.py');
+  };
+
+  otherEditors = () => {
+    return this.state.editors.filter(editor => editor.name !== 'main.py');
   };
 
   getCodeBlocks = () => {
-    const code = this.code;
+    const code = this.mainEditor().code;
     const lines = code
       .split('\n')
       .map(line => line.trimEnd())
@@ -238,26 +239,6 @@ class NormalEditor extends React.Component {
 
   runCode = () => {
     this.runCodeLineByLine(true);
-    // this.restartEditor();
-    // $('#output-area').show();
-    // const kernel = window.thebeKernel;
-    // const outputArea = window.outputArea;
-    // const code = this.code;
-    // outputArea.future = kernel.requestExecute({ code: code });
-    // outputArea.future.done.then(() => {
-    //   let future = kernel.requestExecute({ code: printVarListCode });
-    //   future.onIOPub = msg => {
-    //     if (
-    //       msg.content &&
-    //       msg.content.name &&
-    //       msg.content.text &&
-    //       msg.content.name === 'stdout' &&
-    //       msg.content.text.startsWith('[{"varName":')
-    //     ) {
-    //       this.setState({ varList: JSON.parse(msg.content.text) });
-    //     }
-    //   };
-    // });
   };
 
   finish = () => {
@@ -266,7 +247,7 @@ class NormalEditor extends React.Component {
     this.restartEditor();
   };
 
-  runCodeLineByLine = (autoRun = false) => {
+  runCodeLineByLine = async (autoRun = false) => {
     if (this.isWaitingServer) {
       return;
     }
@@ -275,11 +256,27 @@ class NormalEditor extends React.Component {
     const outputArea = window.outputArea;
     outputArea.model.clear();
     if (!this.startRunLinByLine) {
+      // Put other files to server
+      const contents = window.contents;
+      const allPromises = this.otherEditors().map(editor => {
+        const options = {
+          path: editor.name,
+          type: 'file',
+          name: editor.name,
+          format: 'text',
+          content: editor.code
+        };
+        return contents.save(editor.name, options);
+      });
+      await Promise.all(allPromises);
+      //  Initial state
       this.restartEditor();
       this.startRunLinByLine = true;
       this.isWaitingServer = true;
+      // Get code of main.py
       this.codeBlocks = this.getCodeBlocks();
       const code = this.codeBlocks.map(b => b.code).join('\n');
+      // Initial print var
       let printVarFuture = kernel.requestExecute({ code: printVarListCode });
       printVarFuture.done.then(() => {
         let future = kernel.requestExecute({ code: code });
@@ -450,7 +447,6 @@ class NormalEditor extends React.Component {
         }
       ]
     );
-    // this.editor.revealLineInCenter(lineno);
   };
 
   hideLineDecoration = () => {
@@ -460,8 +456,25 @@ class NormalEditor extends React.Component {
     );
   };
 
+  addFile = () => {
+    const { editors } = this.state;
+    const name = `module_${editors.length}.py`;
+    editors.push({
+      name: name,
+      code: ''
+    });
+    this.setState({
+      editors: editors,
+      activeEditor: name
+    });
+  };
+
+  changeFile = name => {
+    this.setState({ activeEditor: name });
+  };
+
   render() {
-    const code = this.code;
+    const { editors, activeEditor } = this.state;
     const { stdOut, varList } = this.state;
     const options = {
       selectOnLineNumbers: true,
@@ -469,16 +482,46 @@ class NormalEditor extends React.Component {
     };
     return (
       <div>
-        <MonacoEditor
-          width="800"
-          height="600"
-          language="python"
-          theme="vs"
-          value={code}
-          options={options}
-          onChange={this.onChange}
-          editorDidMount={this.editorDidMount}
-        />
+        <div className="mb-3">
+          {editors.map(editor => {
+            return (
+              <button
+                className={`btn ${
+                  activeEditor === editor.name ? 'btn-primary' : 'btn-default'
+                }`}
+                onClick={() => this.changeFile(editor.name)}
+                key={editor.name}
+              >
+                {editor.name}
+              </button>
+            );
+          })}
+        </div>
+        {editors.map(editor => {
+          if (!this.editorMounted && editor.name !== 'main.py') {
+            return null;
+          }
+          const style = {};
+          if (editor.name !== activeEditor) {
+            style.display = 'none';
+          }
+          return (
+            <div style={style} key={editor.name}>
+              <MonacoEditor
+                width="800"
+                height="600"
+                language="python"
+                theme="vs"
+                value={editor.code}
+                options={options}
+                onChange={(newValue, e) => this.onChange(editor.name, newValue)}
+                editorDidMount={
+                  editor.name === 'main.py' ? this.editorDidMount : () => {}
+                }
+              />
+            </div>
+          );
+        })}
         <div className="mb-3">
           <button className="btn btn-primary" onClick={this.runCode}>
             Run
@@ -494,6 +537,9 @@ class NormalEditor extends React.Component {
           </button>
           <button className="btn btn-danger" onClick={this.restartKernel}>
             Restart Kernel
+          </button>
+          <button className="btn btn-primary" onClick={this.addFile}>
+            Add file
           </button>
         </div>
         {stdOut && (
