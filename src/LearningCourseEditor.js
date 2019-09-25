@@ -275,7 +275,6 @@ class LearningCourseEditor extends React.Component {
     const lines = this.parsedCode;
     const editorLines = this.editor.getModel().getLinesContent();
     const widgets = [];
-    const fontSize = this.state.fontSize;
     const lineHeight = this.calculateLineHeight();
     const fontSizePx = `${this.state.fontSize}px`;
     const lineHeightPx = `${this.calculateLineHeight()}px`;
